@@ -13,19 +13,53 @@ const { Redis } = require('@upstash/redis');
 if (!process.env.DATABASE_URL) {
   throw new Error('DATABASE_URL is not set — use the Supabase "Transaction" pooler connection string (port 6543).');
 }
-if (!process.env.UPSTASH_REDIS_REST_URL || !process.env.UPSTASH_REDIS_REST_TOKEN) {
-  throw new Error('UPSTASH_REDIS_REST_URL / UPSTASH_REDIS_REST_TOKEN are not set.');
-}
 
 // Supavisor (Supabase's pooler) speaks the Postgres wire protocol, so the
 // regular `pg` driver works unchanged — just point DATABASE_URL at the
-// pooled connection string instead of the direct one.
+// pooled connection string instead of the direct one. SSL stays on for
+// hosted databases and off for a local one (dev boxes / preview PGlite).
+const isLocalDb = /@(localhost|127\.0\.0\.1)(:|\/|$)/.test(process.env.DATABASE_URL);
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false },
+  ssl: isLocalDb ? false : { rejectUnauthorized: false },
   max: 10 // keep small — Supavisor is what actually manages the real fan-out
 });
 pool.on('error', (err) => console.error('Unexpected Postgres pool error:', err));
+
+// Cache-aside Redis client. Two drivers, same (tiny) API: when REDIS_URL is
+// set (self-hosted/cluster deploys — see SCALING.md), use that same TCP
+// Redis so the cache stops spending Upstash command quota; otherwise use
+// the Upstash REST credentials. One less thing to pay for at scale.
+let redis;
+if (process.env.REDIS_URL) {
+  const { createClient } = require('redis');
+  const tcp = createClient({
+    url: process.env.REDIS_URL,
+    socket: { reconnectStrategy: (retries) => Math.min(250 * 2 ** retries, 15_000) },
+  });
+  tcp.on('error', (e) => console.error('db cache Redis (TCP) error:', e.message));
+  tcp.connect().catch((e) => console.error('db cache Redis (TCP) connect failed:', e.message));
+  redis = {
+    get: async (k) => {
+      const v = await tcp.get(k);
+      if (typeof v !== 'string') return v;
+      try { return JSON.parse(v); } catch { return v; }
+    },
+    set: (k, v, opts) => tcp.set(k, typeof v === 'string' ? v : JSON.stringify(v), opts && opts.ex ? { EX: opts.ex } : undefined),
+    del: (...ks) => tcp.del(ks),
+  };
+} else if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
+  const { Redis } = require('@upstash/redis');
+  redis = new Redis({
+    url: process.env.UPSTASH_REDIS_REST_URL,
+    token: process.env.UPSTASH_REDIS_REST_TOKEN
+  });
+} else {
+  // Cache is an optimization — the app still works (slower) without it, so
+  // warn instead of crash.
+  console.warn('db: no REDIS_URL or UPSTASH_REDIS_REST_* set — per-request cache disabled.');
+  redis = { get: async () => null, set: async () => {}, del: async () => {} };
+}
 
 async function query(sql, params = []) {
   const { rows } = await pool.query(sql, params);
@@ -35,11 +69,6 @@ async function queryOne(sql, params = []) {
   const rows = await query(sql, params);
   return rows[0] || null;
 }
-
-const redis = new Redis({
-  url: process.env.UPSTASH_REDIS_REST_URL,
-  token: process.env.UPSTASH_REDIS_REST_TOKEN
-});
 
 // ---- Cache-aside layer (Layer 2 — replaces the old in-process Map cache;
 // this one is shared across every server instance, not just one process) ----

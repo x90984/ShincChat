@@ -60,7 +60,8 @@ const entry = (gender, over = {}) => ({
   await state.enqueue('sock-F', her);
   const match = await state.findMatch('sock-M', me);
   ok(match && match.candidateId === 'sock-F', 'basic match found', JSON.stringify(match));
-  ok(match && match.entry && match.entry.uid === 'f1', 'match returns candidate entry');
+  ok(match && match.entry && match.entry.userId === 'f1', 'match returns candidate entry');
+  ok(match && match.entry && match.entry.gender === 'female', 'candidate entry carries gender (long form)');
   ok(await state.pairOf('sock-M') === 'sock-F', 'pairOf M -> F');
   ok(await state.pairOf('sock-F') === 'sock-M', 'pairOf F -> M');
   ok(await state.pairUserOf('sock-M') === 'f1', 'pairUserOf M -> f1');

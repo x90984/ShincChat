@@ -302,7 +302,7 @@ return 0
 const oppGender = (g) => (g === 'male' ? 'female' : 'male');
 
 // Entry JSON only carries non-null fields so Lua cjson never has to deal
-// with cjson.null sentinels.
+// with cjson.null sentinels. Short field names keep the hot hash small.
 function encodeEntry(e) {
   const o = {};
   if (e.gender) o.g = e.gender;
@@ -316,6 +316,22 @@ function encodeEntry(e) {
   if (e.userId) o.uid = e.userId;
   o.inst = INSTANCE_ID;
   return JSON.stringify(o);
+}
+// Back to the long names the rest of the app uses (startConversation etc.).
+function decodeEntry(json) {
+  const o = JSON.parse(json);
+  return {
+    gender: o.g || null,
+    lookingFor: o.lf || null,
+    countryMode: o.m || 'random',
+    country: o.c || null,
+    lat: o.la ?? null,
+    lon: o.lo ?? null,
+    detectedCountry: o.dc || null,
+    queuedAt: o.qa || null,
+    userId: o.uid || null,
+    instanceId: o.inst || null,
+  };
 }
 
 // ---- Sessions --------------------------------------------------------------
@@ -542,18 +558,18 @@ async function findMatch(socketId, entry) {
     if (Array.isArray(res) && res.length >= 3) {
       const [candId, candJson, candScore] = res;
       let candEntry;
-      try { candEntry = JSON.parse(candJson); } catch { candEntry = null; }
+      try { candEntry = decodeEntry(candJson); } catch { candEntry = null; }
       if (!candEntry) { await _requeueCandidate(candId, Number(candScore), candJson); continue; }
       // Reverse-direction block (the candidate has blocked the seeker) can't
       // be checked in Lua without shipping every user's blocklist, so it's
       // checked here; on collision the candidate simply goes back in line.
-      if (entry.userId && candEntry.uid && (await blocksOf(candEntry.uid)).has(entry.userId)) {
+      if (entry.userId && candEntry.userId && (await blocksOf(candEntry.userId)).has(entry.userId)) {
         await _requeueCandidate(candId, Number(candScore), candJson);
         continue;
       }
       const claimed = await safe(
         drv.eval(CLAIM_LUA, [K.pairs, K.pairuser, K.queue('male'), K.queue('female'), K.qentry],
-          [socketId, candId, entry.userId || '', candEntry.uid || '']),
+          [socketId, candId, entry.userId || '', candEntry.userId || '']),
         0, 'findMatch claim');
       if (Number(claimed) !== 1) {
         // Beaten to them by another match/call — let them try again fresh.
@@ -562,8 +578,8 @@ async function findMatch(socketId, entry) {
       }
       localQueued.delete(socketId);
       localQueued.delete(candId); // same-instance candidate
-      _notePair(socketId, candId, entry.userId, candEntry.uid);
-      busPublish({ t: 'pair-set', a: socketId, b: candId, aU: entry.userId || '', bU: candEntry.uid || '' });
+      _notePair(socketId, candId, entry.userId, candEntry.userId);
+      busPublish({ t: 'pair-set', a: socketId, b: candId, aU: entry.userId || '', bU: candEntry.userId || '' });
       return { candidateId: candId, entry: candEntry };
     }
     // Nobody compatible available right now → wait in line.

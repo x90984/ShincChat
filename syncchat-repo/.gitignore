@@ -21,3 +21,6 @@ npm-debug.log*
 # OS/editor cruft
 .DS_Store
 .vscode/
+
+# PGlite dev database (preview tooling)
+random-chat/server/data/pglite/
