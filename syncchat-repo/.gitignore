@@ -1,0 +1,23 @@
+# Dependencies
+node_modules/
+
+# SQLite database + WAL/SHM files (runtime data, never commit user data)
+random-chat/server/data/
+admin-panel/data/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Environment variables (secrets — set these in Render's dashboard instead)
+.env
+.env.*
+!.env.example
+
+# Logs
+npm-debug.log*
+*.log
+
+# OS/editor cruft
+.DS_Store
+.vscode/

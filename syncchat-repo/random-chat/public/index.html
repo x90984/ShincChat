@@ -1,0 +1,1641 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>SyncChat — Verified Random Chat</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0A0E17;
+    --bg-soft: #0D1220;
+    --panel: #121826;
+    --panel-2: #1A2233;
+    --border: #232C42;
+    --border-soft: #1B2334;
+    --text: #EAEDF5;
+    --muted: #8B94AC;
+    --muted-2: #626C86;
+
+    --accent: #2DD4BF;       /* teal — verification / trust */
+    --accent-dim: #123832;
+    --accent-2: #6C7CF5;     /* indigo — video / mode switch */
+    --accent-2-dim: #1C2140;
+    --male: #4C8DFF;
+    --female: #F0568C;
+    --warn: #F5A623;
+    --warn-dim: #3A2A0E;
+    --danger: #F0475B;
+    --danger-dim: #391722;
+
+    --radius-lg: 20px;
+    --radius-md: 14px;
+    --radius-sm: 10px;
+    --font-display: 'Sora', 'Inter', -apple-system, sans-serif;
+    --font-body: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    --topbar-h: 64px;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    font-family: var(--font-body);
+    background:
+      radial-gradient(circle at 15% -10%, #14203a 0%, transparent 45%),
+      radial-gradient(circle at 90% 10%, #1a1530 0%, transparent 40%),
+      var(--bg);
+    color: var(--text);
+    display: flex;
+    flex-direction: column;
+    -webkit-font-smoothing: antialiased;
+  }
+  button { font-family: var(--font-body); }
+  ::selection { background: var(--accent); color: #06110F; }
+
+  /* ================= Topbar (brand + all controls + status) ================= */
+  .topbar {
+    height: var(--topbar-h);
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 0 20px;
+    border-bottom: 1px solid var(--border-soft);
+    background: rgba(10, 14, 23, 0.9);
+    backdrop-filter: blur(10px);
+    position: sticky;
+    top: 0;
+    z-index: 50;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; flex: none; }
+  .brand-mark {
+    width: 28px; height: 28px; border-radius: 8px;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    display: flex; align-items: center; justify-content: center;
+    flex: none;
+  }
+  .brand-mark img { width: 16px; height: 16px; filter: brightness(0) invert(1); }
+  .brand-name { font-family: var(--font-display); font-weight: 600; font-size: 15.5px; letter-spacing: -0.01em; }
+  .brand-tag { font-size: 11px; color: var(--muted-2); letter-spacing: .04em; text-transform: uppercase; margin-left: 2px; }
+
+  .topbar-controls { display: none; align-items: center; gap: 8px; flex: 1; justify-content: center; }
+  .topbar-controls.active { display: flex; }
+
+  .topbar-status { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--muted); flex: none; white-space: nowrap; }
+  .dot-live { width: 7px; height: 7px; border-radius: 50%; background: var(--muted-2); flex: none; }
+  .dot-live.on { background: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim); animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .5; } }
+
+  /* Partner-connection chip — replaces the match-preference/country button
+     in the top bar (that control now lives only in Settings). Shows a
+     small partner avatar with an online/offline presence dot. */
+  .partner-status-chip {
+    display: flex; align-items: center; gap: 7px; padding: 6px 12px 6px 6px;
+    border-radius: 999px; background: var(--panel-2); flex: none; white-space: nowrap;
+    cursor: pointer; transition: filter .12s ease;
+  }
+  .partner-status-chip:hover { filter: brightness(1.15); }
+  .partner-status-chip.disabled { cursor: default; }
+  .partner-status-chip.disabled:hover { filter: none; }
+  .partner-status-avatar {
+    position: relative; width: 24px; height: 24px; border-radius: 50%; flex: none;
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--font-display); font-weight: 700; font-size: 11px; color: #fff;
+    background: linear-gradient(135deg, var(--muted-2), var(--panel-2));
+  }
+  .partner-status-avatar.male { background: linear-gradient(135deg, var(--male), #2a5fc9); }
+  .partner-status-avatar.female { background: linear-gradient(135deg, var(--female), #c93b6f); }
+  .partner-status-avatar .presence-dot {
+    position: absolute; right: -1px; bottom: -1px; width: 9px; height: 9px; border-radius: 50%;
+    background: var(--muted-2); border: 2px solid var(--panel-2);
+  }
+  .partner-status-avatar .presence-dot.on { background: var(--accent); }
+  .partner-status-chip-text { font-size: 12.5px; font-weight: 600; color: var(--text); }
+
+  /* Circular icon-chip buttons (chats / notifications) — same treatment
+     Facebook/Instagram use for their top-bar icons: a plain glyph inside
+     a soft circular hit-area, with a badge for unread counts. */
+  .icon-chip-btn {
+    position: relative; flex: none; width: 38px; height: 38px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center; border: none; cursor: pointer;
+    background: var(--panel-2); color: var(--text); transition: filter .12s ease;
+  }
+  .icon-chip-btn:hover { filter: brightness(1.15); }
+  .icon-chip-btn .ic-logo { width: 17px; height: 17px; object-fit: contain; filter: brightness(0) invert(1); opacity: .92; }
+  .icon-chip-btn svg { width: 19px; height: 19px; display: block; }
+  .icon-chip-badge {
+    position: absolute; top: -2px; right: -2px; min-width: 16px; height: 16px; padding: 0 3px;
+    border-radius: 999px; background: var(--danger, #F4364C); color: #fff; font-size: 10px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center; line-height: 1; border: 2px solid var(--bg, #0A0E17);
+  }
+  .icon-chip-group { display: flex; align-items: center; gap: 8px; }
+
+  .ctrl-btn {
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    padding: 8px 13px; border-radius: 999px; border: 1px solid transparent; cursor: pointer;
+    font-size: 12.5px; font-weight: 700; background: var(--panel-2); color: var(--text);
+    transition: filter .12s ease; white-space: nowrap;
+  }
+  .ctrl-btn:hover { filter: brightness(1.15); }
+  .ctrl-btn .ic { font-size: 13px; line-height: 1; }
+  .ctrl-btn .ic-logo { width: 15px; height: 15px; object-fit: contain; display: block; filter: brightness(0) invert(1); opacity: .92; }
+  .ctrl-btn.verify { background: var(--accent-dim); color: var(--accent); border-color: rgba(45,212,191,.25); }
+  .ctrl-btn.country { background: var(--accent-2-dim); color: #B9C0FF; border-color: rgba(108,124,245,.25); }
+  .ctrl-btn.switch { background: var(--accent-2-dim); color: #B9C0FF; border-color: rgba(108,124,245,.25); }
+  .ctrl-btn.skip { background: var(--warn-dim); color: var(--warn); border-color: rgba(245,166,35,.25); }
+  .ctrl-btn.report { background: var(--danger-dim); color: var(--danger); border-color: rgba(240,71,91,.25); }
+  .ctrl-btn.stop { background: var(--panel-2); color: var(--muted); }
+  .ctrl-btn.start { background: var(--accent-dim); color: var(--accent); border-color: rgba(45,212,191,.3); }
+
+  /* Small round pulsing "cancel searching" indicator — replaces the old
+     full-width Stop button while a search/connect is in progress. */
+  .stop-indicator {
+    flex: none; width: 28px; height: 28px; border-radius: 50%; border: none; cursor: pointer;
+    background: var(--danger); position: relative; display: flex; align-items: center; justify-content: center;
+  }
+  .stop-indicator::before { content: ''; width: 9px; height: 9px; border-radius: 2px; background: #fff; }
+  .stop-indicator::after {
+    content: ''; position: absolute; inset: -4px; border-radius: 50%; border: 2px solid var(--danger);
+    opacity: .6; animation: stopIndicatorPulse 1.6s ease-out infinite;
+  }
+  @keyframes stopIndicatorPulse {
+    0% { transform: scale(.8); opacity: .6; }
+    100% { transform: scale(1.5); opacity: 0; }
+  }
+
+  /* ================= Layout shell ================= */
+  .app-shell { flex: 1; display: flex; align-items: center; justify-content: center; min-height: 0; padding: 24px 20px; overflow-y: auto; }
+
+  /* ================= Gate (shared by the auth gate and the post-login
+     landing gate, so both look like one consistent, professional flow) ================= */
+  .gate-card {
+    width: 100%; max-width: 480px; background: var(--panel); flex-shrink: 0;
+    border: 1px solid var(--border); border-radius: var(--radius-lg);
+    overflow: hidden; box-shadow: 0 24px 60px -20px rgba(0,0,0,.6);
+  }
+  .gate-accent-strip { height: 4px; background: linear-gradient(90deg, var(--male), var(--accent), var(--female)); }
+  .gate-body { padding: 36px 36px 30px; }
+  .gate-card .eyebrow { font-size: 11.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); font-weight: 600; margin-bottom: 8px; }
+  .gate-card h1 { margin: 0 0 6px; font-family: var(--font-display); font-size: 24px; font-weight: 600; letter-spacing: -0.01em; }
+  .gate-card .sub { color: var(--muted); font-size: 13.5px; margin-bottom: 28px; line-height: 1.5; }
+  .auth-brand { margin-bottom: 18px; }
+  .auth-brand .brand-name { font-family: var(--font-display); font-weight: 700; font-size: 17px; }
+
+  /* Social login */
+  .social-row { display: flex; gap: 10px; margin-bottom: 4px; }
+  .social-btn {
+    flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px;
+    padding: 11px 0; border-radius: var(--radius-sm); border: 1.5px solid var(--border);
+    background: var(--panel-2); color: var(--text); font-size: 13px; font-weight: 600;
+    cursor: pointer; transition: all .15s ease;
+  }
+  .social-btn:hover { border-color: var(--muted-2); filter: brightness(1.1); }
+  .social-btn:disabled { opacity: .4; cursor: not-allowed; }
+  .social-hint { font-size: 11.5px; color: var(--muted-2); text-align: center; min-height: 14px; margin-top: 8px; }
+  .divider { display: flex; align-items: center; gap: 12px; color: var(--muted-2); font-size: 11.5px; margin: 22px 0 18px; }
+  .divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: var(--border-soft); }
+
+  .field-label { color: var(--muted); font-size: 12.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .03em; margin: 22px 0 10px; text-align: left; }
+  .field-label:first-of-type { margin-top: 0; }
+  .gender-row { display: flex; gap: 10px; }
+  .gender-btn {
+    flex: 1; padding: 15px 0; border-radius: var(--radius-sm); border: 1.5px solid var(--border);
+    background: var(--panel-2); color: var(--text); font-size: 14.5px; font-weight: 600;
+    cursor: pointer; transition: all .15s ease;
+  }
+  .gender-btn:hover { border-color: var(--muted-2); }
+  .gender-btn.selected.male { border-color: var(--male); background: #14213f; box-shadow: 0 0 0 3px rgba(76,141,255,.12); }
+  .gender-btn.selected.female { border-color: var(--female); background: #3a1526; box-shadow: 0 0 0 3px rgba(240,86,140,.12); }
+  .gender-btn.selected.video, .gender-btn.selected.text { border-color: var(--accent); background: var(--accent-dim); box-shadow: 0 0 0 3px rgba(45,212,191,.12); }
+
+  #startBtn, #genderContinueBtn {
+    width: 100%; padding: 15px; border-radius: var(--radius-sm); border: none;
+    background: linear-gradient(90deg, var(--accent-2), var(--accent)); color: #06110F;
+    font-weight: 700; font-size: 14.5px; cursor: pointer; margin-top: 26px;
+    transition: opacity .15s ease, transform .1s ease;
+  }
+  #startBtn:not(:disabled):hover, #genderContinueBtn:not(:disabled):hover { opacity: .92; }
+  #startBtn:not(:disabled):active, #genderContinueBtn:not(:disabled):active { transform: scale(.99); }
+  #startBtn:disabled, #genderContinueBtn:disabled { opacity: .35; cursor: not-allowed; }
+  #genderStatus { font-size: 12.5px; margin-top: 12px; color: var(--muted); min-height: 16px; line-height: 1.5; text-align: center; }
+  #genderStatus.err { color: var(--danger); }
+  #permStatus { font-size: 12.5px; margin-top: 14px; color: var(--muted); min-height: 16px; line-height: 1.5; text-align: center; }
+  #permStatus.ok { color: var(--accent); }
+  #permStatus.err { color: var(--danger); }
+
+  /* ================= Chat screen ================= */
+  #chatScreen { display: none; width: 100%; max-width: 1360px; height: 100%; gap: 14px; flex-direction: column; }
+  #chatScreen.active { display: flex; }
+
+  .stage-wrap { flex: 1; min-height: 0; position: relative; display: flex; gap: 3px; }
+
+  .video-stage { position: absolute; inset: 0; display: flex; gap: 3px; }
+  .video-wrap {
+    position: relative; flex: 1; background: #000; overflow: hidden; min-width: 0;
+    border-radius: 8px; border: 1px solid var(--border);
+  }
+  video { width: 100%; height: 100%; object-fit: cover; display: block; }
+  /* Mirror both feeds — the standard "looks like a mirror" webcam
+     convention, applied to your own preview and to the stranger's video
+     alike (their camera feels mirrored to them the same way, so mirroring
+     it on your screen too keeps left/right gestures — waving, pointing —
+     reading the same way for both of you). Only the recorded verify clip
+     stays unmirrored, since that's what actually gets sent/stored. */
+  #localVideo, #remoteVideo { transform: scaleX(-1); }
+  .video-label {
+    position: absolute; top: 14px; left: 14px; z-index: 3;
+    background: rgba(10,14,23,.65); backdrop-filter: blur(6px);
+    padding: 5px 12px; border-radius: 999px; font-size: 12px; font-weight: 600;
+    display: flex; align-items: center; gap: 6px;
+    border: 1px solid rgba(255,255,255,.08);
+  }
+  .video-label .dot-live { width: 6px; height: 6px; }
+  /* Keep the mirror while blurred/zoomed — scaleX(-1) has to stay in the
+     transform list alongside scale(1.15), or the blurred state would
+     suddenly un-mirror and visibly flip the moment a match connects. */
+  #remoteVideo.blurred { filter: blur(55px) saturate(1.2) brightness(.9); transform: scaleX(-1) scale(1.15); }
+  #remoteVideoClip.blurred { filter: blur(45px) saturate(1.2) brightness(.9); transform: scale(1.15); }
+  #remoteVideo.partner-away-blur { filter: blur(40px) saturate(1.1) brightness(.85); transform: scaleX(-1) scale(1.12); }
+  .video-label#partnerLabel { cursor: pointer; }
+  .partner-away-note {
+    position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 3;
+    background: rgba(0,0,0,.55); color: #fff; padding: 8px 14px; border-radius: 999px; font-size: 12.5px; font-weight: 600;
+    pointer-events: none;
+  }
+
+  .preview-overlay {
+    position: absolute; inset: 0; z-index: 7; display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
+    padding: 24px; gap: 14px; background: linear-gradient(to top, rgba(5,8,14,.75), transparent 55%);
+    pointer-events: none; /* only the buttons below should intercept clicks, not the whole panel */
+  }
+  .preview-actions button { pointer-events: auto; }
+  .preview-text { color: #F1F3F9; font-size: 13px; text-align: center; max-width: 340px; line-height: 1.5; }
+  .preview-actions { display: flex; gap: 10px; }
+  .preview-actions button { padding: 11px 26px; border-radius: 999px; border: none; font-weight: 700; font-size: 13.5px; cursor: pointer; }
+  #previewGoBtn { background: var(--accent); color: #06110F; }
+  #previewSkipBtn { background: rgba(255,255,255,.1); color: #fff; border: 1px solid rgba(255,255,255,.15); }
+
+  .searching-overlay {
+    position: absolute; inset: 0; z-index: 2; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px;
+    background: radial-gradient(circle at 50% 40%, #10182B 0%, #0A0E17 75%);
+  }
+  /* Same visual language as the video-panel searching overlay, but sized
+     for the full text-chat stage and hidden by default — only the JS
+     layer (showSearching/hideSearching) toggles it on, and only while
+     chatMode === 'text'. */
+  .searching-overlay.text-mode {
+    display: none; z-index: 6; border-radius: 8px; border: 1px solid var(--border);
+    background: radial-gradient(circle at 50% 38%, #131B30 0%, #0A0E17 80%);
+  }
+  .searching-overlay.text-mode.show { display: flex; }
+  .searching-overlay.text-mode .search-visual { width: 124px; height: 124px; }
+  .searching-overlay.text-mode .search-logo { width: 70px; height: 70px; }
+  .searching-overlay.text-mode .search-logo img { width: 36px; height: 36px; }
+  .searching-overlay.text-mode .searching-title { font-size: 17.5px; }
+  .spinner-ring { width: 52px; height: 52px; border-radius: 50%; border: 3px solid var(--border); border-top-color: var(--accent); animation: spin 1s linear infinite; }
+  /* ---- Professional "radar" searching visual: logo at the center with
+     expanding pulse rings, used by both the video-panel and text-mode
+     searching overlays. ---- */
+  .search-visual { position: relative; width: 108px; height: 108px; display: flex; align-items: center; justify-content: center; }
+  .search-ring {
+    position: absolute; inset: 0; border-radius: 50%; border: 1.5px solid var(--accent);
+    opacity: 0; animation: searchPing 2.4s cubic-bezier(.2,.6,.4,1) infinite;
+  }
+  .search-ring.r2 { animation-delay: .8s; }
+  .search-ring.r3 { animation-delay: 1.6s; }
+  @keyframes searchPing { 0% { transform: scale(.55); opacity: .5; } 100% { transform: scale(1); opacity: 0; } }
+  .search-logo {
+    position: relative; z-index: 2; width: 62px; height: 62px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent-2, #6C7CF5), var(--accent));
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 10px 34px -8px var(--accent-2, #6C7CF5), 0 0 0 1px rgba(255,255,255,.08) inset;
+    animation: searchLogoBreathe 2.4s ease-in-out infinite;
+  }
+  .search-logo img { width: 32px; height: 32px; filter: brightness(0) invert(1); }
+  @keyframes searchLogoBreathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.06); } }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .searching-title { font-family: var(--font-display); font-weight: 700; font-size: 16px; margin-top: 4px; }
+  .searching-sub { font-size: 11px; letter-spacing: .14em; color: var(--muted-2); text-transform: uppercase; font-weight: 700; }
+  .searching-brand { font-family: var(--font-display); font-weight: 600; font-size: 12px; color: var(--muted-2); letter-spacing: .04em; margin-top: 2px; }
+
+  /* Toast: transient status line shown once at the top of the stranger
+     panel in video mode — the one exception besides chat text and the
+     switch-mode card, and only ever one at a time. */
+  .status-toast {
+    position: absolute; top: 14px; left: 50%; transform: translateX(-50%) translateY(-8px);
+    z-index: 9; background: rgba(10,14,23,.75); backdrop-filter: blur(8px);
+    border: 1px solid rgba(255,255,255,.1); border-radius: 999px;
+    padding: 7px 16px; font-size: 12px; font-weight: 600; color: #F1F3F9;
+    opacity: 0; pointer-events: none; transition: opacity .25s ease, transform .25s ease;
+    max-width: 80%; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .status-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* Switch-to-text Agree/Decline card, video mode only: floats as its own
+     layer above the typed-message text (which stays visible, just dimmed,
+     underneath) — never inserted into the #messages list, so it can never
+     collide with or scroll away among chat bubbles. No dismiss-on-backdrop;
+     the user must press Agree or Decline. */
+  .switch-mode-overlay {
+    position: absolute; inset: 0; z-index: 10; display: none; align-items: center; justify-content: center;
+    padding: 24px; background: rgba(5,8,14,.55); backdrop-filter: blur(2px);
+  }
+  .switch-mode-overlay.show { display: flex; }
+  .switch-mode-overlay .verify-card { pointer-events: auto; }
+
+  /* Onboarding nudge: promote Text mode as the recommended way to start */
+  .mode-btn { position: relative; }
+  .mode-badge {
+    position: absolute; top: -9px; right: -6px; background: var(--accent); color: #06110F;
+    font-size: 9.5px; font-weight: 800; letter-spacing: .02em; text-transform: uppercase;
+    padding: 3px 7px; border-radius: 999px; white-space: nowrap;
+  }
+  .mode-tip {
+    font-size: 12px; line-height: 1.55; color: var(--muted); background: var(--panel-2);
+    border: 1px solid var(--border-soft); border-radius: var(--radius-sm); padding: 10px 12px; margin-top: 12px;
+  }
+  .mode-tip strong { color: var(--text); }
+  .gender-btn.locked, .gender-btn:disabled {
+    opacity: .4; cursor: not-allowed; filter: grayscale(.4);
+  }
+
+  /* Switch-to-Video control starts locked/faded in an active text chat and
+     brightens up once it unlocks (see .ctrl-btn.locked below) */
+  #switchModeBtn.locked { opacity: .4; filter: grayscale(.5); cursor: not-allowed; }
+  #switchModeBtn.locked:hover { opacity: .4; }
+
+  /* Global toast — fixed at the very top of the whole screen, independent
+     of the chat stage/messages layout, so it can never overlap the
+     stranger's video panel toast, the switch-mode card, or chat bubbles. */
+  .global-toast {
+    position: fixed; top: 14px; left: 50%; transform: translateX(-50%) translateY(-14px);
+    z-index: 200; background: var(--panel); border: 1px solid var(--border); color: var(--text);
+    padding: 11px 18px; border-radius: 999px; font-size: 13px; font-weight: 600;
+    box-shadow: 0 10px 30px rgba(0,0,0,.4); opacity: 0; pointer-events: none; transition: all .25s ease;
+    max-width: 90vw; text-align: center;
+  }
+  .global-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* ================= Report modal ================= */
+  .report-backdrop {
+    position: fixed; inset: 0; background: rgba(5,8,14,.65); z-index: 150;
+    opacity: 0; pointer-events: none; transition: opacity .18s ease;
+  }
+  .report-backdrop.show { opacity: 1; pointer-events: auto; }
+  .report-modal {
+    position: fixed; top: 50%; left: 50%; transform: translate(-50%, -46%); width: 380px; max-width: 90vw;
+    z-index: 151; background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 22px; opacity: 0; pointer-events: none; transition: all .18s ease; box-shadow: 0 30px 80px rgba(0,0,0,.5);
+  }
+  .report-modal.show { opacity: 1; transform: translate(-50%, -50%); pointer-events: auto; }
+  .report-modal-header { font-family: var(--font-display); font-weight: 700; font-size: 17px; margin-bottom: 6px; }
+  .report-modal-sub { font-size: 12.5px; color: var(--muted); line-height: 1.5; margin-bottom: 16px; }
+  .report-modal-sub strong { color: var(--danger); }
+  .report-reasons { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+  .report-reason {
+    display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: var(--radius-sm);
+    border: 1.5px solid var(--border); cursor: pointer; font-size: 13px; transition: border-color .12s ease;
+  }
+  .report-reason:has(input:checked) { border-color: var(--danger); background: rgba(240,71,91,.08); }
+  .report-reason input { accent-color: var(--danger); cursor: pointer; }
+  #reportDetails {
+    width: 100%; min-height: 70px; padding: 10px 12px; border-radius: var(--radius-sm); border: 1.5px solid var(--border);
+    background: var(--panel-2); color: var(--text); font-family: var(--font-body); font-size: 13px; resize: vertical; margin-bottom: 14px;
+  }
+  .report-modal-actions { display: flex; gap: 10px; }
+  .report-cancel, .report-submit { flex: 1; padding: 11px; border-radius: var(--radius-sm); border: none; font-weight: 700; font-size: 13px; cursor: pointer; }
+  .report-cancel { background: var(--panel-2); color: var(--muted); }
+  .report-submit { background: var(--danger); color: #fff; }
+  .report-submit:disabled { opacity: .4; cursor: not-allowed; }
+
+  /* ---- Country / nearby picker modal (top bar) ---- */
+  .country-backdrop {
+    position: fixed; inset: 0; background: rgba(5,8,14,.65); z-index: 150;
+    opacity: 0; pointer-events: none; transition: opacity .18s ease;
+  }
+  .country-backdrop.show { opacity: 1; pointer-events: auto; }
+  .country-modal {
+    position: fixed; top: 50%; left: 50%; transform: translate(-50%, -46%); width: 400px; max-width: 90vw;
+    max-height: 78vh; display: flex; flex-direction: column;
+    z-index: 151; background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 20px 20px 14px; opacity: 0; pointer-events: none; transition: all .18s ease; box-shadow: 0 30px 80px rgba(0,0,0,.5);
+  }
+  .country-modal.show { opacity: 1; transform: translate(-50%, -50%); pointer-events: auto; }
+  .country-modal-header { font-family: var(--font-display); font-weight: 700; font-size: 17px; margin-bottom: 4px; display: flex; align-items: center; justify-content: space-between; }
+  .country-modal-header button { background: none; border: none; color: var(--muted); font-size: 15px; cursor: pointer; padding: 4px; }
+  .country-modal-sub { font-size: 12.5px; color: var(--muted); line-height: 1.5; margin-bottom: 14px; }
+  .country-quick { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; flex: none; }
+  .country-option {
+    display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: var(--radius-sm);
+    border: 1.5px solid var(--border); cursor: pointer; font-size: 13.5px; transition: border-color .12s ease, background .12s ease;
+  }
+  .country-option:hover { border-color: rgba(108,124,245,.4); }
+  .country-option.selected { border-color: var(--accent-2, #6C7CF5); background: rgba(108,124,245,.1); }
+  .country-option .flag { font-size: 17px; line-height: 1; width: 22px; text-align: center; flex: none; }
+  .country-option .name { flex: 1; }
+  .country-option .desc { font-size: 11px; color: var(--muted); }
+  .country-option .check { color: var(--accent-2, #6C7CF5); font-weight: 700; display: none; }
+  .country-option.selected .check { display: block; }
+  #countrySearchInput {
+    width: 100%; padding: 10px 12px; border-radius: var(--radius-sm); border: 1.5px solid var(--border);
+    background: var(--panel-2); color: var(--text); font-family: var(--font-body); font-size: 13px; margin-bottom: 8px; flex: none;
+  }
+  .country-list { overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 6px; padding-bottom: 6px; }
+  .country-list .country-option { padding: 8px 12px; font-size: 13px; }
+  .country-empty { text-align: center; color: var(--muted); font-size: 12.5px; padding: 16px 0; }
+
+  .contacts-match-row { flex: none; padding: 0 14px 10px; display: flex; flex-direction: column; gap: 6px; }
+  .contacts-match-row .friend-btn { width: 100%; padding: 9px; font-size: 12.5px; }
+  .contacts-match-status { font-size: 11.5px; color: var(--muted); text-align: center; }
+
+  /* In-chat nudge suggesting a switch from text to video once there's been
+     some back-and-forth ("confirm the vibe" before going face to face) */
+
+  /* ================= Auth gate ================= */
+  .auth-tabs { display: flex; gap: 6px; background: var(--panel-2); border-radius: 999px; padding: 4px; margin-bottom: 6px; }
+  .auth-tab { flex: 1; padding: 9px 0; border: none; border-radius: 999px; background: transparent; color: var(--muted); font-weight: 700; font-size: 13px; cursor: pointer; }
+  .auth-tab.selected { background: var(--accent); color: #06110F; }
+  .auth-input {
+    width: 100%; padding: 13px 14px; border-radius: var(--radius-sm); border: 1.5px solid var(--border);
+    background: var(--panel-2); color: var(--text); font-size: 14px; outline: none; font-family: var(--font-body);
+  }
+  .auth-input:focus { border-color: var(--accent); }
+  #authGate #authSubmitBtn {
+    width: 100%; padding: 15px; border-radius: var(--radius-sm); border: none;
+    background: linear-gradient(90deg, var(--accent-2), var(--accent)); color: #06110F;
+    font-weight: 700; font-size: 14.5px; cursor: pointer; margin-top: 22px;
+  }
+  #authGate #authSubmitBtn:disabled { opacity: .5; cursor: not-allowed; }
+  #authStatus { font-size: 12.5px; margin-top: 14px; color: var(--muted); min-height: 16px; line-height: 1.5; text-align: center; }
+  #authStatus.err { color: var(--danger); }
+  #authStatus.ok { color: var(--accent); }
+  .username-hint { font-size: 11.5px; margin: -12px 0 12px 2px; min-height: 14px; }
+  .username-hint.ok { color: var(--accent); }
+  .username-hint.err { color: var(--danger); }
+  .username-hint.checking { color: var(--muted-2); }
+
+  /* ================= Messaging: delete / reply / disappearing ================= */
+  .icon-btn-sm {
+    background: none; border: none; color: var(--muted); font-size: 15px; cursor: pointer;
+    padding: 4px 6px; border-radius: 6px; line-height: 1;
+  }
+  .icon-btn-sm:hover { background: var(--panel-2); color: var(--text); }
+  .history-panel-header #deleteAllChatsBtn { margin-left: auto; margin-right: 4px; }
+
+  .popover-menu {
+    position: fixed; z-index: 400; background: var(--panel, #151A24); border: 1px solid var(--border-soft);
+    border-radius: var(--radius-sm); box-shadow: 0 8px 28px rgba(0,0,0,.35); min-width: 190px; overflow: hidden;
+    padding: 6px;
+  }
+  .popover-title { font-size: 11px; font-weight: 700; color: var(--muted-2); text-transform: uppercase; letter-spacing: .04em; padding: 6px 10px 4px; }
+  .popover-item {
+    display: block; width: 100%; text-align: left; background: none; border: none; color: var(--text);
+    font-size: 13.5px; padding: 9px 10px; border-radius: 6px; cursor: pointer; font-family: var(--font-body);
+  }
+  .popover-item:hover { background: var(--panel-2); }
+  .popover-item.danger { color: var(--danger); }
+  .popover-item.active { color: var(--accent); font-weight: 700; }
+
+  /* ================= Reviews & recent-chats popup ================= */
+  .reviews-backdrop {
+    position: fixed; inset: 0; background: rgba(5,8,14,.55); z-index: 420;
+    opacity: 0; pointer-events: none; transition: opacity .18s ease;
+  }
+  .reviews-backdrop.show { opacity: 1; pointer-events: auto; }
+
+  /* Small, wide, landscape-oriented card rather than a tall vertical
+     modal — profile / reviews / messages sit side by side in one row. */
+  .reviews-popup {
+    position: fixed; top: 18%; left: 50%; transform: translateX(-50%);
+    width: 620px; max-width: 94vw; height: 300px; max-height: 60vh;
+    z-index: 421; background: var(--panel); border: 1px solid var(--border);
+    border-radius: var(--radius-md); box-shadow: 0 30px 80px rgba(0,0,0,.55);
+    display: none; flex-direction: column; overflow: hidden;
+  }
+  .reviews-popup.show { display: flex; }
+
+  .reviews-popup-header {
+    display: flex; align-items: center; gap: 8px; padding: 10px 8px 10px 14px;
+    border-bottom: 1px solid var(--border-soft); cursor: grab; user-select: none;
+    -webkit-user-select: none; flex: none; background: var(--panel-2);
+  }
+  .reviews-popup-header:active { cursor: grabbing; }
+  .reviews-popup-drag-handle { color: var(--muted-2); font-size: 14px; letter-spacing: -2px; transform: rotate(90deg); }
+  .reviews-popup-title { font-family: var(--font-display); font-weight: 700; font-size: 13.5px; flex: 1; }
+  .reviews-popup-close {
+    background: none; border: none; color: var(--muted); font-size: 18px; line-height: 1;
+    cursor: pointer; padding: 4px 8px; border-radius: 6px;
+  }
+  .reviews-popup-close:hover { background: var(--panel); color: var(--text); }
+
+  /* Body: one horizontal row, three columns. */
+  .reviews-popup-body { flex: 1; min-height: 0; position: relative; }
+  .reviews-popup-loading, .reviews-popup-empty {
+    color: var(--muted); font-size: 12.5px; text-align: center; padding: 0; height: 100%;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .reviews-partner-panel { display: flex; align-items: stretch; height: 100%; }
+  .reviews-col { min-width: 0; padding: 12px 14px; overflow-y: auto; }
+  .reviews-col + .reviews-col { border-left: 1px solid var(--border-soft); }
+  .reviews-col-id { flex: 0 0 132px; display: flex; flex-direction: column; align-items: center; text-align: center; justify-content: center; gap: 6px; overflow: visible; }
+  .reviews-col-reviews, .reviews-col-messages { flex: 1 1 0; }
+
+  .reviews-partner-avatar {
+    width: 46px; height: 46px; border-radius: 50%; background: var(--panel-2); color: var(--text);
+    display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 16px;
+    overflow: hidden; flex: none;
+  }
+  .reviews-partner-avatar img { width: 100%; height: 100%; object-fit: cover; }
+  .reviews-partner-name { font-weight: 700; font-size: 13px; line-height: 1.25; }
+  .reviews-partner-sub { font-size: 11px; color: var(--muted); }
+  .reviews-partner-view-link {
+    font-size: 11px; font-weight: 700; color: var(--accent); background: none; border: none; cursor: pointer; padding: 2px 0;
+  }
+
+  .reviews-section-label {
+    font-size: 10.5px; font-weight: 700; color: var(--muted-2); text-transform: uppercase;
+    letter-spacing: .04em; margin: 0 0 8px;
+  }
+  .reviews-list { display: flex; flex-direction: column; gap: 7px; }
+  .reviews-list-empty, .reviews-messages-empty { color: var(--muted-2); font-size: 12px; text-align: center; padding: 10px 4px; }
+  .review-card { background: var(--panel-2); border-radius: var(--radius-sm); padding: 8px 10px; }
+  .review-card-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 3px; gap: 6px; }
+  .review-card-author { font-size: 11.5px; font-weight: 700; }
+  .review-card-tag {
+    font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em;
+    padding: 2px 6px; border-radius: 999px; flex: none;
+  }
+  .review-card-tag.genuine { background: var(--accent-dim); color: var(--accent); }
+  .review-card-tag.fake, .review-card-tag.suspicious { background: var(--danger-dim); color: var(--danger); }
+  .review-card-comment { font-size: 11.5px; color: var(--text); line-height: 1.4; }
+
+  /* Momentum-scrolling message list: native touch momentum on mobile via
+     -webkit-overflow-scrolling, plus a JS-driven inertia flick for mouse
+     drag on desktop (see initInertiaScroll in app.js). */
+  .reviews-messages-list {
+    height: calc(100% - 22px); overflow-y: auto; -webkit-overflow-scrolling: touch;
+    display: flex; flex-direction: column; gap: 6px; cursor: grab; padding-right: 2px;
+  }
+  .reviews-messages-list:active { cursor: grabbing; }
+  .reviews-msg-row { display: flex; }
+  .reviews-msg-row.mine { justify-content: flex-end; }
+  .reviews-msg-bubble {
+    max-width: 82%; padding: 6px 10px; border-radius: 11px; font-size: 11.5px; line-height: 1.35;
+    background: var(--panel-2); color: var(--text);
+  }
+  .reviews-msg-row.mine .reviews-msg-bubble { background: var(--accent-dim); color: var(--text); }
+
+  /* Footer: <  1 2 3 ... 10  > pager, compact and centered. */
+  .reviews-popup-footer {
+    flex: none; display: flex; align-items: center; justify-content: center; gap: 4px;
+    padding: 8px 10px; border-top: 1px solid var(--border-soft); background: var(--panel-2);
+  }
+  .reviews-nav-arrow {
+    flex: none; width: 26px; height: 26px; border-radius: 50%; border: none; background: var(--panel);
+    color: var(--text); font-size: 12px; cursor: pointer; opacity: .85; transition: opacity .12s ease, background .12s ease;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .reviews-nav-arrow:hover { opacity: 1; background: var(--border-soft); }
+  .reviews-nav-arrow:disabled { opacity: .25; cursor: default; }
+  .reviews-pager { display: flex; align-items: center; gap: 3px; }
+  .reviews-pager-num {
+    min-width: 22px; height: 22px; padding: 0 4px; border-radius: 6px; border: none; background: none;
+    color: var(--muted); font-size: 11.5px; font-weight: 700; cursor: pointer; transition: background .12s ease, color .12s ease;
+  }
+  .reviews-pager-num:hover { background: var(--panel); color: var(--text); }
+  .reviews-pager-num.active { background: var(--accent); color: #fff; }
+
+  .msg { cursor: pointer; }
+  .msg.deleted { font-style: italic; color: var(--muted-2); cursor: default; }
+  .msg-reply-quote {
+    display: block; border-left: 2px solid var(--accent-2, #6C7CF5); padding: 3px 8px; margin-bottom: 5px;
+    font-size: 11.5px; color: var(--muted); background: rgba(255,255,255,.04); border-radius: 4px; opacity: .9;
+  }
+  .msg-seen-tick { font-size: 10px; color: var(--accent); margin-left: 6px; }
+
+  .reply-bar {
+    display: flex; align-items: center; gap: 10px; padding: 8px 12px; margin: 0 10px 6px;
+    background: var(--panel-2); border-left: 3px solid var(--accent-2, #6C7CF5); border-radius: 8px;
+  }
+  .reply-bar-body { flex: 1; min-width: 0; }
+  .reply-bar-label { font-size: 11px; color: var(--accent-2, #6C7CF5); font-weight: 700; }
+  .reply-bar-text { font-size: 12.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .reply-bar button { background: none; border: none; color: var(--muted); font-size: 14px; cursor: pointer; padding: 4px; }
+
+  /* ---- Multi-select messages (long-press to start) ---- */
+  .msg.selectable { user-select: none; -webkit-user-select: none; }
+  .msg.selected {
+    outline: 2px solid var(--accent-2, #6C7CF5); outline-offset: 2px;
+    box-shadow: 0 0 0 5px rgba(108,124,245,.14), 0 2px 10px rgba(0,0,0,.25);
+  }
+  #messages.selecting .msg:not(.selected) { opacity: .72; }
+  .selection-bar {
+    display: none; align-items: center; gap: 10px; margin: 0 10px 8px; padding: 8px 10px 8px 16px;
+    background: var(--panel-2); border: 1px solid var(--border); border-radius: 999px;
+    box-shadow: 0 6px 20px -6px rgba(0,0,0,.4); animation: profileFadeUp .18s ease both;
+  }
+  .selection-bar.show { display: flex; }
+  .selection-bar .sel-count { flex: 1; font-size: 13px; font-weight: 600; color: var(--text); }
+  .selection-bar .sel-btn {
+    background: none; border: none; color: var(--muted); font-size: 13px; font-weight: 600; cursor: pointer;
+    padding: 7px 12px; border-radius: 999px; display: flex; align-items: center; gap: 5px; white-space: nowrap;
+  }
+  .selection-bar .sel-btn:hover { background: var(--panel); color: var(--text); }
+  .selection-bar .sel-btn.danger { color: var(--danger); font-size: 15px; padding: 7px 10px; }
+  .selection-bar .sel-btn.danger:hover { background: rgba(240,90,90,.12); }
+  #selCancelBtn { font-size: 14px; padding: 7px 8px; }
+
+  /* Gender self-declaration, shown alongside signup only — a real
+     acknowledgement, not fine print, since it's what backs the report/ban
+     policy for misrepresenting gender. */
+  .declaration-box {
+    display: flex; align-items: flex-start; gap: 10px; margin-top: 14px; padding: 12px 13px;
+    background: rgba(230, 57, 70, .08); border: 1px solid rgba(230, 57, 70, .35);
+    border-radius: var(--radius-sm); cursor: pointer; text-align: left;
+  }
+  .declaration-box input[type="checkbox"] {
+    flex: none; width: 17px; height: 17px; margin-top: 1px; accent-color: var(--danger); cursor: pointer;
+  }
+  .declaration-box span { font-size: 12px; line-height: 1.55; color: var(--muted); }
+  .declaration-box span strong { color: var(--text); font-weight: 700; }
+
+  /* ================= History (Telegram-style panel) ================= */
+  .history-toggle { flex: none; }
+  .history-backdrop {
+    position: fixed; inset: 0; background: rgba(5,8,14,.6); z-index: 90;
+    opacity: 0; pointer-events: none; transition: opacity .2s ease;
+  }
+  .history-backdrop.show { opacity: 1; pointer-events: auto; }
+  .history-panel {
+    position: fixed; top: 0; right: 0; bottom: 0; width: 340px; max-width: 88vw; z-index: 91;
+    background: var(--panel); border-left: 1px solid var(--border);
+    display: flex; flex-direction: column; transform: translateX(100%); transition: transform .22s ease;
+    box-shadow: -20px 0 50px -20px rgba(0,0,0,.6);
+  }
+  .history-panel.show { transform: translateX(0); }
+  .history-panel-header {
+    flex: none; height: var(--topbar-h); display: flex; align-items: center; justify-content: space-between;
+    padding: 0 18px; border-bottom: 1px solid var(--border-soft); font-family: var(--font-display); font-weight: 600; font-size: 15px;
+  }
+  .history-panel-header button { background: none; border: none; color: var(--muted); font-size: 15px; cursor: pointer; padding: 6px; }
+  .history-list { flex: 1; overflow-y: auto; padding: 8px; }
+  .history-empty { color: var(--muted-2); font-size: 13px; text-align: center; padding: 40px 20px; }
+  .history-item {
+    display: flex; align-items: center; gap: 12px; padding: 12px 10px; border-radius: var(--radius-sm); cursor: pointer;
+    transition: background .12s ease;
+  }
+  .history-item:hover { background: var(--panel-2); }
+  .history-item.has-unread .history-item-name { font-weight: 700; color: var(--text); }
+  .history-item.has-unread .history-item-preview { color: var(--text); font-weight: 500; }
+  .history-unread-badge {
+    flex: none; min-width: 19px; height: 19px; padding: 0 5px; border-radius: 999px; background: var(--accent);
+    color: #06251f; font-size: 11px; font-weight: 800; display: flex; align-items: center; justify-content: center;
+  }
+
+  /* ================= Side menu (Instagram/Facebook-style "hamburger" panel,
+     opened from the round profile-photo button in the topbar) ================= */
+  .side-menu-backdrop {
+    position: fixed; inset: 0; background: rgba(5,8,14,.6); z-index: 92;
+    opacity: 0; pointer-events: none; transition: opacity .2s ease;
+  }
+  .side-menu-backdrop.show { opacity: 1; pointer-events: auto; }
+  .side-menu {
+    position: fixed; top: 0; right: 0; bottom: 0; width: 320px; max-width: 88vw; z-index: 93;
+    background: var(--panel); border-left: 1px solid var(--border);
+    display: flex; flex-direction: column; transform: translateX(100%); transition: transform .22s ease;
+    box-shadow: -20px 0 50px -20px rgba(0,0,0,.6); overflow-y: auto;
+  }
+  .side-menu.show { transform: translateX(0); }
+  .side-menu-header {
+    flex: none; display: flex; align-items: center; gap: 12px; padding: 22px 18px 16px;
+    border-bottom: 1px solid var(--border-soft); cursor: pointer;
+  }
+  .side-menu-avatar {
+    width: 52px; height: 52px; border-radius: 50%; flex: none; overflow: hidden; display: flex; align-items: center; justify-content: center;
+    font-family: var(--font-display); font-weight: 700; font-size: 19px; color: #fff; box-shadow: 0 0 0 2px var(--accent-2, #6C7CF5);
+  }
+  .side-menu-avatar.male { background: linear-gradient(135deg, var(--male), #2a5fc9); }
+  .side-menu-avatar.female { background: linear-gradient(135deg, var(--female), #c93b6f); }
+  .side-menu-avatar img { width: 100%; height: 100%; object-fit: cover; }
+  .side-menu-id { min-width: 0; flex: 1; }
+  .side-menu-name { font-family: var(--font-display); font-weight: 700; font-size: 15.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .side-menu-view { font-size: 12px; color: var(--accent-2, #6C7CF5); font-weight: 600; margin-top: 2px; }
+  .side-menu-close { background: none; border: none; color: var(--muted); font-size: 15px; cursor: pointer; padding: 6px; flex: none; }
+
+  .side-menu-section { padding: 8px 0; border-bottom: 1px solid var(--border-soft); }
+  .side-menu-section:last-of-type { border-bottom: none; }
+  .side-menu-item {
+    width: 100%; display: flex; align-items: center; gap: 14px; padding: 12px 18px; background: none; border: none;
+    color: var(--text); font-family: var(--font-body); font-size: 13.5px; font-weight: 500; cursor: pointer; text-align: left;
+  }
+  .side-menu-item:hover { background: var(--panel-2); }
+  .side-menu-item .smi-ic { font-size: 16px; width: 20px; text-align: center; flex: none; color: var(--muted); }
+  .side-menu-item .smi-lb { flex: 1; }
+  .side-menu-item .smi-chev { color: var(--muted-2); font-size: 12px; transition: transform .15s ease; }
+  .side-menu-item.expanded .smi-chev { transform: rotate(90deg); }
+  .side-menu-item.danger { color: var(--danger); }
+  .side-menu-item.danger .smi-ic { color: var(--danger); }
+
+  .side-menu-sub { display: none; flex-direction: column; background: var(--bg-soft); }
+  .side-menu-sub.show { display: flex; }
+  .side-menu-sub .side-menu-item { padding-left: 34px; font-size: 13px; }
+
+  .side-menu-toggle-row { display: flex; align-items: center; gap: 14px; padding: 12px 18px 12px 34px; }
+  .side-menu-toggle-row .smi-lb { flex: 1; font-size: 13px; }
+  .side-menu-toggle-row.indent { padding-left: 50px; }
+  .side-menu-item.nested .smi-chev { transition: transform .15s ease; }
+  .side-menu-item.nested.expanded .smi-chev { transform: rotate(90deg); }
+  .side-menu-sub2 { display: none; flex-direction: column; background: var(--bg-soft); border-top: 1px solid var(--border-soft); border-bottom: 1px solid var(--border-soft); }
+  .side-menu-sub2.show { display: flex; }
+  .side-menu-sub2 .side-menu-toggle-row:not(:last-child) { border-bottom: 1px dashed var(--border-soft); }
+  .side-menu-switch { position: relative; width: 38px; height: 22px; flex: none; }
+  .side-menu-switch input { opacity: 0; width: 0; height: 0; position: absolute; }
+  .side-menu-switch-track {
+    position: absolute; inset: 0; background: var(--panel-2); border: 1px solid var(--border); border-radius: 999px; cursor: pointer; transition: background .15s ease;
+  }
+  .side-menu-switch-track::before {
+    content: ''; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: var(--muted); transition: transform .15s ease, background .15s ease;
+  }
+  .side-menu-switch input:checked + .side-menu-switch-track { background: var(--accent-dim); border-color: transparent; }
+  .side-menu-switch input:checked + .side-menu-switch-track::before { transform: translateX(16px); background: var(--accent); }
+
+  .side-menu-info-card { margin: 6px 18px 12px; padding: 12px 14px; border-radius: var(--radius-sm); background: var(--bg-soft); border: 1px solid var(--border-soft); font-size: 12px; color: var(--muted); line-height: 1.6; }
+
+  /* Round profile-photo button that replaces the old "Profile" text button */
+  .avatar-btn {
+    flex: none; width: 34px; height: 34px; border-radius: 50%; padding: 0; border: none; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; overflow: hidden;
+    font-family: var(--font-display); font-weight: 700; font-size: 13px; color: #fff;
+    box-shadow: 0 0 0 2px var(--border);
+  }
+  .avatar-btn:hover { box-shadow: 0 0 0 2px var(--accent-2, #6C7CF5); }
+  .avatar-btn.male { background: linear-gradient(135deg, var(--male), #2a5fc9); }
+  .avatar-btn.female { background: linear-gradient(135deg, var(--female), #c93b6f); }
+  .avatar-btn img { width: 100%; height: 100%; object-fit: cover; }
+  .history-avatar {
+    flex: none; width: 42px; height: 42px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    font-family: var(--font-display); font-weight: 700; font-size: 15px; color: #fff; position: relative; cursor: pointer;
+  }
+  .history-avatar:hover { box-shadow: 0 0 0 2px var(--accent-2, #6C7CF5); }
+  .history-avatar.male { background: linear-gradient(135deg, var(--male), #2a5fc9); }
+  .history-avatar.female { background: linear-gradient(135deg, var(--female), #c93b6f); }
+  .history-avatar .online-dot {
+    position: absolute; bottom: -1px; right: -1px; width: 11px; height: 11px; border-radius: 50%;
+    background: var(--muted-2); border: 2px solid var(--panel);
+  }
+  .history-avatar .online-dot.on { background: var(--accent); }
+  .history-item-body { flex: 1; min-width: 0; }
+  .history-item-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .history-item-name { font-weight: 600; font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .history-item-time { font-size: 11px; color: var(--muted-2); flex: none; }
+  .history-item-preview { font-size: 12.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
+
+  .user-search-input {
+    flex: none; margin: 12px 14px 0; padding: 9px 12px; border-radius: var(--radius-sm); border: 1.5px solid var(--border);
+    background: var(--panel-2); color: var(--text); font-family: var(--font-body); font-size: 13px;
+  }
+  .history-tabs { flex: none; display: flex; gap: 4px; padding: 10px 14px 4px; }
+  .history-tab {
+    padding: 6px 12px; border-radius: 999px; font-size: 12.5px; color: var(--muted); cursor: pointer;
+    border: 1px solid var(--border); display: flex; align-items: center; gap: 6px;
+  }
+  .history-tab.selected { color: var(--text); border-color: var(--accent-2, #6C7CF5); background: rgba(108,124,245,.1); }
+  .tab-badge {
+    background: var(--danger, #F0475B); color: #fff; font-size: 10px; font-weight: 700; border-radius: 999px;
+    padding: 1px 6px; line-height: 1.4;
+  }
+  .friend-btn {
+    flex: none; font-size: 11.5px; font-weight: 600; padding: 6px 10px; border-radius: 999px; border: 1.5px solid var(--border);
+    background: none; color: var(--text); cursor: pointer; white-space: nowrap;
+  }
+  .friend-btn.primary { background: var(--accent-2, #6C7CF5); border-color: transparent; color: #fff; }
+  .friend-btn.muted { color: var(--muted); }
+  .friend-btn-row { display: flex; gap: 6px; flex: none; }
+  .history-item .history-item-body { cursor: pointer; }
+
+  /* ================= Profile — full-page view (Instagram/Facebook-style,
+     not a small popup) ================= */
+  .profile-page {
+    position: fixed; inset: 0; z-index: 200; background: var(--bg, #0B0E14);
+    display: flex; flex-direction: column;
+    opacity: 0; pointer-events: none; transform: translateY(12px); transition: opacity .18s ease, transform .18s ease;
+  }
+  .profile-page.show { opacity: 1; pointer-events: auto; transform: translateY(0); }
+  .profile-page-header {
+    flex: none; height: var(--topbar-h); display: flex; align-items: center; justify-content: space-between;
+    padding: 0 16px; z-index: 2; position: relative; border-bottom: 1px solid var(--border-soft);
+    font-family: var(--font-display); font-weight: 600; font-size: 15px;
+  }
+  .profile-page-header.on-cover button, .profile-page-header.on-cover .edit-link { color: #fff; }
+  .profile-page-header.on-cover #profileHeaderTitle { opacity: 0; }
+  .profile-page-header button {
+    background: rgba(10,14,23,.45); backdrop-filter: blur(6px); border: none; color: #fff; font-size: 16px;
+    cursor: pointer; padding: 7px; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  }
+  .profile-page-header .edit-link {
+    color: #fff; background: rgba(10,14,23,.45); backdrop-filter: blur(6px); font-weight: 700; font-size: 12.5px;
+    width: auto; padding: 7px 14px; border-radius: 999px;
+  }
+  .profile-page-header.on-cover { position: absolute; top: 0; left: 0; right: 0; border-bottom: none; }
+  .profile-body { flex: 1; overflow-y: auto; text-align: center; padding: 0 0 40px; max-width: 480px; margin: 0 auto; width: 100%; }
+
+  /* ---- Cover banner + overlapping avatar ---- */
+  .profile-cover {
+    height: 136px; width: 100%; position: relative; overflow: hidden;
+    background: linear-gradient(120deg, var(--accent-2-dim), var(--accent-dim) 55%, var(--panel-2));
+    background-size: 200% 200%; animation: coverShift 9s ease infinite;
+  }
+  .profile-cover::after {
+    /* Fine dotted texture + bottom vignette so the banner reads as a
+       deliberate design surface rather than a flat gradient fill. */
+    content: ''; position: absolute; inset: 0;
+    background-image: radial-gradient(rgba(255,255,255,.09) 1px, transparent 1px);
+    background-size: 14px 14px;
+    -webkit-mask-image: linear-gradient(to bottom, #000 0%, transparent 85%);
+    mask-image: linear-gradient(to bottom, #000 0%, transparent 85%);
+  }
+  @keyframes coverShift { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+  .profile-cover.male { background-image: linear-gradient(120deg, #16305e, var(--accent-dim) 55%, var(--panel-2)); }
+  .profile-cover.female { background-image: linear-gradient(120deg, #5e1638, var(--accent-dim) 55%, var(--panel-2)); }
+  .profile-avatar-wrap {
+    width: 116px; height: 116px; margin: -60px auto 0; position: relative; z-index: 1;
+    border-radius: 50%; padding: 4px; background: var(--bg, #0A0E17);
+    box-shadow: 0 12px 28px -10px rgba(0,0,0,.55);
+    animation: profileRise .45s cubic-bezier(.2,.7,.3,1) both;
+  }
+  .profile-avatar-lg {
+    width: 100%; height: 100%; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    font-family: var(--font-display); font-weight: 700; font-size: 36px; color: #fff; overflow: hidden; flex: none;
+    box-shadow: 0 0 0 2.5px var(--accent-2, #6C7CF5), 0 0 0 5px rgba(108,124,245,.14);
+  }
+  .profile-avatar-lg.male { background: linear-gradient(135deg, var(--male), #2a5fc9); }
+  .profile-avatar-lg.female { background: linear-gradient(135deg, var(--female), #c93b6f); }
+  .profile-avatar-lg img { width: 100%; height: 100%; object-fit: cover; }
+  .profile-avatar-wrap.online::after {
+    content: ''; position: absolute; right: 5px; bottom: 5px; width: 16px; height: 16px; border-radius: 50%;
+    background: var(--accent); border: 3px solid var(--bg, #0A0E17); box-shadow: 0 0 0 2px var(--accent-dim);
+  }
+
+  @keyframes profileRise { from { opacity: 0; transform: translateY(10px) scale(.94); } to { opacity: 1; transform: translateY(0) scale(1); } }
+  @keyframes profileFadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  .profile-top, .profile-bio-card, .profile-actions { animation: profileFadeUp .4s ease both; }
+  .profile-top { animation-delay: .05s; }
+  .profile-bio-card { animation-delay: .1s; }
+  .profile-actions { animation-delay: .15s; }
+
+  .profile-top { padding: 14px 20px 0; }
+  .profile-name-row { display: flex; align-items: center; justify-content: center; gap: 6px; }
+  .profile-name { font-family: var(--font-display); font-weight: 700; font-size: 21px; letter-spacing: -.01em; }
+  .profile-name .verified-badge { color: var(--accent); font-size: 15px; filter: drop-shadow(0 0 6px var(--accent-dim)); }
+  .profile-username { font-size: 12.5px; color: var(--muted-2); margin-top: 2px; }
+
+  /* ---- Followers / Following stat row ---- */
+  .profile-stats { display: flex; gap: 28px; justify-content: center; margin-top: 14px; }
+  .profile-stat { display: flex; flex-direction: column; align-items: center; gap: 1px; }
+  .profile-stat-n { font-family: var(--font-display); font-weight: 700; font-size: 16px; color: var(--text); }
+  .profile-stat-lb { font-size: 11px; color: var(--muted-2); font-weight: 600; }
+
+  /* ---- Instagram-style badge pills (premium / gender / status) ---- */
+  .profile-badges { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; margin: 14px 0 0; }
+  .profile-badge {
+    display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 600; padding: 5px 12px;
+    border-radius: 999px; background: var(--panel-2); border: 1px solid var(--border-soft); color: var(--muted);
+    transition: transform .15s ease;
+  }
+  .profile-badge.online { color: var(--accent); background: var(--accent-dim); border-color: transparent; }
+  .profile-badge.premium { color: var(--warn); background: var(--warn-dim); border-color: transparent; }
+  .profile-badge .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+  .profile-bio-card {
+    margin: 20px 20px 0; padding: 14px 16px; border-radius: var(--radius-md); background: var(--panel);
+    border: 1px solid var(--border-soft); text-align: left; position: relative;
+    box-shadow: 0 2px 12px rgba(0,0,0,.18);
+  }
+  .profile-bio-label {
+    font-size: 10.5px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--muted-2);
+    margin-bottom: 6px;
+  }
+  .profile-bio { font-size: 13.5px; color: var(--text); line-height: 1.55; white-space: pre-wrap; }
+  .profile-bio.empty { color: var(--muted-2); font-style: italic; }
+
+  .profile-actions { display: flex; gap: 8px; justify-content: center; padding: 20px 20px 6px; }
+  .profile-actions .friend-btn {
+    flex: 1; max-width: 190px; padding: 11px 16px; font-size: 13.5px; border-radius: 999px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center; gap: 6px; transition: transform .12s ease, box-shadow .12s ease;
+  }
+  .profile-actions .friend-btn:hover { transform: translateY(-1px); }
+  .friend-btn.primary { box-shadow: 0 4px 14px -4px var(--accent-2, #6C7CF5); }
+
+  /* ---- Edit-profile form (own profile only) ---- */
+  .profile-edit-form { text-align: left; margin-top: 10px; display: flex; flex-direction: column; gap: 14px; }
+  .profile-edit-avatar-row { display: flex; flex-direction: column; align-items: center; gap: 8px; margin-bottom: 4px; }
+  .profile-edit-avatar-row #editAvatarPreview { width: 108px; height: 108px; }
+  .profile-edit-avatar-row label { font-size: 12px; color: var(--accent-2, #6C7CF5); font-weight: 600; cursor: pointer; }
+  .profile-field-label { font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 6px; }
+  .profile-edit-form input[type="text"], .profile-edit-form input[type="url"], .profile-edit-form textarea {
+    width: 100%; padding: 12px 13px; border-radius: var(--radius-sm); border: 1.5px solid var(--border);
+    background: var(--panel-2); color: var(--text); font-family: var(--font-body); font-size: 13.5px; outline: none; resize: none;
+  }
+  .profile-edit-form input[type="text"]:focus, .profile-edit-form input[type="url"]:focus, .profile-edit-form textarea:focus { border-color: var(--accent); }
+  .profile-char-count { font-size: 11px; color: var(--muted-2); text-align: right; margin-top: 4px; }
+  .profile-edit-actions { display: flex; gap: 10px; margin-top: 4px; }
+  .profile-edit-actions button {
+    flex: 1; padding: 12px; border-radius: var(--radius-sm); border: none; font-weight: 700; font-size: 13px; cursor: pointer;
+  }
+  .profile-edit-save { background: linear-gradient(90deg, var(--accent-2), var(--accent)); color: #06110F; }
+  .profile-edit-save:disabled { opacity: .5; cursor: not-allowed; }
+  .profile-edit-cancel { background: var(--panel-2); color: var(--muted); }
+
+  /* ---- YouTube verify link ---- */
+  .profile-youtube-link {
+    display: inline-flex; align-items: center; gap: 6px; margin-top: 12px; padding: 7px 14px;
+    border-radius: 999px; background: var(--panel-2); color: var(--text); font-size: 12.5px; font-weight: 700;
+    text-decoration: none; border: 1px solid var(--border-soft);
+  }
+  .profile-youtube-link:hover { filter: brightness(1.15); }
+  .profile-youtube-link.empty { background: none; border: none; color: var(--muted-2); font-weight: 500; font-style: italic; padding: 0; }
+
+  /* ---- Reviews section (public genuine/fake/suspicious ratings) ---- */
+  .profile-reviews-section { margin: 20px 20px 24px; text-align: left; }
+  .reviews-summary { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .reviews-avg { font-size: 20px; font-weight: 800; color: var(--text); }
+  .reviews-count { font-size: 12px; color: var(--muted); margin-left: 4px; }
+  .review-star { color: var(--muted-2); font-size: 15px; }
+  .review-star.on { color: #F5B301; }
+  .review-star-picker { display: flex; gap: 4px; margin-bottom: 10px; cursor: pointer; }
+  .review-star-picker .review-star { font-size: 22px; }
+  .reviews-tag-breakdown { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+  .review-tag-chip { font-size: 10.5px; font-weight: 700; padding: 3px 9px; border-radius: 999px; background: var(--panel-2); color: var(--muted); }
+  .review-tag-chip.genuine { background: rgba(60,200,120,.15); color: #3CC878; }
+  .review-tag-chip.fake { background: rgba(244,54,76,.15); color: var(--danger, #F4364C); }
+  .review-tag-chip.suspicious { background: rgba(245,179,1,.15); color: #F5B301; }
+  .review-item {
+    padding: 12px 14px; margin-bottom: 8px; border-radius: var(--radius-md); background: var(--panel);
+    border: 1px solid var(--border-soft);
+  }
+  .review-item-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
+  .review-item-author { font-size: 12.5px; font-weight: 700; color: var(--text); }
+  .review-item-comment { font-size: 12.5px; color: var(--muted); margin-top: 4px; line-height: 1.5; }
+  .review-report-btn {
+    margin-top: 6px; background: none; border: none; color: var(--muted-2); font-size: 10.5px; cursor: pointer; padding: 0; text-decoration: underline;
+  }
+  .review-form {
+    margin-top: 16px; padding: 14px 16px; border-radius: var(--radius-md); background: var(--panel);
+    border: 1px solid var(--border-soft); display: flex; flex-direction: column; gap: 10px;
+  }
+  .review-form select, .review-form textarea {
+    width: 100%; padding: 10px 12px; border-radius: var(--radius-sm); border: 1.5px solid var(--border);
+    background: var(--panel-2); color: var(--text); font-family: var(--font-body); font-size: 13px; outline: none; resize: none;
+  }
+  .profile-edit-status { font-size: 12px; color: var(--muted); text-align: center; min-height: 16px; }
+  .profile-edit-status.err { color: var(--danger); }
+
+  /* Resume/connection notices (partner offline/busy, etc.) now surface as
+     a toast (see showGlobalToast) instead of a banner that used to squeeze
+     the chat screen's height whenever it appeared. */
+
+  /* Chat overlay: sits on top of the stranger panel in video mode (right
+     half only — nothing shown on the "You" side), becomes the whole
+     stage in text mode since there's no video to overlay. Both get a
+     visible panel border + slight rounding. */
+  #messages {
+    position: absolute; top: 0; right: 0; width: 50%; height: 100%; z-index: 5;
+    overflow-y: auto; padding: 18px 18px 18px; display: flex; flex-direction: column; gap: 10px;
+    border-left: 1px solid var(--border); border-radius: 0 8px 8px 0;
+  }
+  #messages::-webkit-scrollbar { width: 6px; }
+  #messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  #messages.full-chat { position: static; width: 100%; flex: 1; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; }
+
+  .msg {
+    padding: 9px 13px; border-radius: var(--radius-sm); max-width: 82%; font-size: 13.5px; line-height: 1.45;
+    box-shadow: 0 2px 10px rgba(0,0,0,.25); transition: opacity .25s ease;
+    /* A message with no spaces (a long word, a pasted URL/token) would
+       otherwise overflow max-width instead of wrapping, stretching the
+       bubble — and the whole chat panel/video overlay with it — far
+       wider than intended. white-space: pre-wrap keeps real line breaks
+       the user typed while still allowing mid-word breaks when needed. */
+    overflow-wrap: anywhere; word-break: break-word; white-space: pre-wrap;
+  }
+  /* Video mode only: one click on the stranger's screen fades the typed
+     text out (still there, just invisible + non-interactive so video
+     underneath is unobstructed); clicking again fades it back in. Cards
+     (e.g. the switch-mode Agree/Decline) are excluded so they never
+     vanish on a stray click. */
+  #messages.text-hidden .msg { opacity: 0; pointer-events: none; }
+  /* The rule above only fades the individual bubbles — the container itself
+     still has overflow-y:auto and the (now invisible) messages still take
+     up scrollable height, so the scrollbar stays visible on its own even
+     though there's nothing visibly there to scroll. Hiding overflow here
+     removes it along with everything else while faded. */
+  #messages.text-hidden { overflow: hidden; }
+  .msg.self { align-self: flex-end; background: linear-gradient(135deg, var(--accent-2), #5866D9); color: #fff; border-bottom-right-radius: 4px; }
+  .msg.partner { align-self: flex-start; background: var(--panel-2); border-bottom-left-radius: 4px; }
+  .msg.system { align-self: center; color: #C9CEDC; font-size: 11.5px; background: rgba(10,14,23,.55); backdrop-filter: blur(4px); padding: 5px 12px; border-radius: 999px; }
+
+  /* Video mode: message bubbles overlay the video directly — no box, just text */
+  #messages:not(.full-chat) .msg { background: none; box-shadow: none; padding: 3px 2px; border-radius: 0; }
+  #messages:not(.full-chat) .msg.self { color: #7FE8DB; text-shadow: 0 1px 4px rgba(0,0,0,.9), 0 0 2px rgba(0,0,0,.9); }
+  #messages:not(.full-chat) .msg.partner { color: #FFFFFF; text-shadow: 0 1px 4px rgba(0,0,0,.9), 0 0 2px rgba(0,0,0,.9); }
+  /* Note: which items are even allowed to appear on the stranger's video
+     screen (chat text + the switch-mode card only) is enforced in app.js
+     via addMessage()/addCard() — not by hiding things with CSS here, so
+     there's a single source of truth instead of two systems disagreeing. */
+
+  .verify-card { align-self: center; background: var(--panel-2); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 12px; text-align: center; max-width: 92%; box-shadow: 0 4px 16px rgba(0,0,0,.3); }
+  .verify-card > div:first-child { font-size: 12.5px; color: var(--muted); margin-bottom: 8px; line-height: 1.4; }
+  .verify-card img, .verify-card video { width: 180px; height: 180px; object-fit: cover; object-position: center center; border-radius: var(--radius-sm); filter: blur(18px); transition: filter .3s; background: #000; display: block; margin: 0 auto; }
+  .verify-card video.mine { transform: scaleX(-1); } /* your own clip, mirrored to match how you see yourself live */
+  .verify-card img.revealed, .verify-card video.revealed { filter: blur(0); }
+  .verify-card .actions { display: flex; gap: 8px; justify-content: center; margin-top: 10px; }
+  .verify-card button { padding: 7px 14px; border-radius: 999px; border: none; font-size: 12px; font-weight: 700; cursor: pointer; }
+  .verify-card .accept { background: var(--accent); color: #06110F; }
+  .verify-card .decline { background: var(--panel); color: var(--muted); border: 1px solid var(--border); }
+  .verify-card .reveal-btn { background: var(--accent-2); color: #fff; }
+
+  .voice-msg { display: flex; align-items: center; gap: 8px; }
+  .voice-msg audio { height: 32px; max-width: 200px; }
+
+  /* Bottom pill input bar, full width under both panels */
+  .bottom-input-bar { flex: none; }
+  .chat-input {
+    display: flex; align-items: center; gap: 8px; width: 100%; margin: 0;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 999px; padding: 8px 8px 8px 24px;
+  }
+  .chat-input input {
+    flex: 1; padding: 12px 0; border: none; background: transparent; color: var(--text); font-size: 14px; outline: none;
+  }
+  .chat-input input::placeholder { color: var(--muted-2); }
+  .chat-input button {
+    padding: 12px 30px; border-radius: 999px; border: none; background: var(--accent-2); color: #fff; font-weight: 700; font-size: 14px; cursor: pointer;
+  }
+  .chat-input button:disabled { opacity: .4; cursor: not-allowed; }
+  .mic-btn {
+    position: relative;
+    flex: none; width: 42px; height: 42px; border-radius: 50%; border: none; cursor: pointer;
+    background: var(--panel-2); color: var(--text); font-size: 17px; display: flex; align-items: center; justify-content: center;
+    transition: background .15s ease, transform .1s ease; user-select: none; touch-action: none;
+  }
+  .mic-btn.recording { background: var(--danger); color: #fff; animation: mic-pulse 1s infinite; transform: scale(1.05); }
+  @keyframes mic-pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(240,71,91,.5); } 50% { box-shadow: 0 0 0 8px rgba(240,71,91,0); } }
+  .recording-hint {
+    position: fixed; bottom: 92px; left: 50%; transform: translateX(-50%);
+    background: var(--danger); color: #fff; font-size: 12px; font-weight: 700; padding: 6px 14px; border-radius: 999px;
+    display: none; white-space: nowrap; z-index: 999; box-shadow: 0 6px 20px rgba(0,0,0,.4);
+  }
+  .recording-hint.show { display: block; }
+
+  canvas#captureCanvas { display: none; }
+
+  /* ================================================================
+     MOBILE — same architecture, resized: controls collapse to icons in
+     the topbar, video panels stack shorter, chat overlay/full-chat and
+     pill input behave the same way as desktop.
+     ================================================================ */
+  @media (max-width: 860px) {
+    :root { --topbar-h: 56px; }
+    .app-shell { padding: 10px; align-items: stretch; }
+    .topbar { padding: 0 10px; gap: 8px; }
+    .brand-tag { display: none; }
+    .brand-name { font-size: 13.5px; }
+    .topbar-controls { gap: 4px; overflow-x: auto; justify-content: flex-start; }
+    .ctrl-btn { padding: 7px 9px; font-size: 0; gap: 0; }
+    .ctrl-btn .ic { font-size: 15px; }
+    .topbar-status { display: none; }
+
+    #gate { border-radius: var(--radius-md); max-width: 100%; margin: auto; }
+    .gate-body { padding: 26px 22px; }
+
+    #chatScreen { gap: 10px; max-width: 100%; height: 100%; }
+    .video-label { top: 8px; left: 8px; font-size: 11px; padding: 4px 9px; }
+    #messages { padding: 12px; }
+
+    .chat-input { max-width: 100%; padding: 5px 5px 5px 16px; }
+  }
+
+  /* Prevent text selection on interactive UI chrome (buttons, badges, chips,
+     tabs, menu items) so quick/double clicks trigger actions instead of
+     highlighting text. Message content and inputs remain selectable. */
+  button,
+  .ctrl-btn,
+  .icon-btn-sm,
+  .icon-chip-btn,
+  .icon-chip-group,
+  .icon-chip-badge,
+  .avatar-btn,
+  .popover-menu,
+  .popover-item,
+  .history-tabs,
+  .history-tab,
+  .tab-badge,
+  .friend-btn,
+  .side-menu-header,
+  .side-menu-close,
+  .side-menu-section,
+  .partner-status-chip,
+  .partner-status-chip-text,
+  .reviews-nav-arrow,
+  .reviews-popup-close,
+  .reviews-pager-num,
+  [role="button"],
+  [role="menuitem"],
+  [role="tab"] {
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    -webkit-touch-callout: none;
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand">
+    <div class="brand-mark"><img src="/assets/syncchat-logo.svg" alt=""></div>
+    <div class="brand-name">SyncChat</div>
+    <span class="brand-tag">Verified Random Chat</span>
+  </div>
+  <div class="topbar-controls" id="topbarControls">
+    <!-- Match preference (country/nearby picker) now lives only in Settings
+         (see #smiMatchPrefs); kept in the DOM so that entry point still
+         works, but no longer shown here in the top bar. -->
+    <button id="countryBtn" class="ctrl-btn country" style="display:none;"><span class="ic">&#127760;</span><span class="lb" id="countryBtnLabel">India</span></button>
+    <div class="partner-status-chip disabled" id="partnerStatusChip" role="button" tabindex="0" title="View profile" aria-label="View partner profile">
+      <span class="partner-status-avatar" id="partnerStatusAvatar">
+        <span class="presence-dot" id="partnerStatusDot"></span>
+      </span>
+      <span class="partner-status-chip-text" id="partnerStatusChipText">Not connected</span>
+    </div>
+    <button id="verifyBtn" class="ctrl-btn verify"><span class="ic">&#10003;</span><span class="lb">Verify</span></button>
+    <button id="voiceBtn" class="ctrl-btn switch"><span class="ic">&#128266;</span><span class="lb">Voice</span></button>
+    <button id="switchModeBtn" class="ctrl-btn switch"><span class="ic">&#8646;</span><span class="lb">Switch to Video</span></button>
+    <button id="skipBtn" class="ctrl-btn skip"><span class="ic">&#9193;</span><span class="lb">Skip</span></button>
+    <button id="reportBtn" class="ctrl-btn report"><span class="ic">&#9873;</span><span class="lb">Report</span></button>
+    <button id="searchStartBtn" class="ctrl-btn start" style="display:none;"><span class="ic">&#9654;</span><span class="lb">Start</span></button>
+    <button id="searchStopIndicator" class="stop-indicator" style="display:none;" title="Cancel searching" aria-label="Cancel searching"></button>
+  </div>
+  <div class="topbar-status" id="topbarStatus" style="display:none;">
+    <span class="dot-live" id="topbarDot" style="display:none;"></span>
+    <span id="topbarStatusText" style="display:none;">Not connected</span>
+    <button id="disappearingBtn" class="icon-btn-sm" title="Disappearing messages" aria-label="Disappearing messages" style="display:none;">&#9201;</button>
+    <button id="moreBtn" class="icon-btn-sm" title="More" aria-label="More options" style="display:none;font-size:17px;">&#8942;</button>
+  </div>
+  <div class="icon-chip-group">
+    <button id="historyBtn" class="icon-chip-btn" style="display:none;" title="Chats" aria-label="Chats"><img class="ic-logo" src="/assets/syncchat-logo.svg" alt=""></button>
+    <button id="notifBtn" class="icon-chip-btn" style="display:none;" title="Notifications" aria-label="Notifications">
+      <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12 2.5c-3.31 0-6 2.69-6 6v3.19c0 .64-.25 1.25-.7 1.7l-.99.99A1.6 1.6 0 0 0 5.44 17H18.56a1.6 1.6 0 0 0 1.13-2.62l-.99-.99a2.4 2.4 0 0 1-.7-1.7V8.5c0-3.31-2.69-6-6-6Z" fill="currentColor"/>
+        <path d="M9.5 19.5a2.5 2.5 0 0 0 5 0h-5Z" fill="currentColor"/>
+      </svg>
+      <span class="icon-chip-badge" id="notifBadge" style="display:none;">0</span>
+    </button>
+  </div>
+  <button id="avatarMenuBtn" class="avatar-btn" style="display:none;" aria-label="Menu"></button>
+</div>
+
+<!-- Disappearing-messages picker — anchored near the topbar toggle -->
+<div id="disappearingMenu" class="popover-menu" style="display:none;">
+  <div class="popover-title">Disappearing messages</div>
+  <button data-mode="none" class="popover-item">Never</button>
+  <button data-mode="24h" class="popover-item">After 24 hours</button>
+  <button data-mode="on_view" class="popover-item">Once seen</button>
+</div>
+
+<!-- Top-bar "more" (\u22ee) menu — shown while chatting with someone -->
+<div id="moreMenu" class="popover-menu" style="display:none;">
+  <button data-act="reviews" class="popover-item">&#11088; Reviews</button>
+  <button data-act="clear-chat" class="popover-item">&#128465; Clear chat</button>
+  <button data-act="toggle-mute" id="moreMenuMuteItem" class="popover-item">&#128263; Mute notifications</button>
+  <button data-act="toggle-block" id="moreMenuBlockItem" class="popover-item danger">&#128683; Block</button>
+</div>
+
+<!-- Reviews & recent-chats popup — draggable, compact, horizontally laid
+     out. A pager (< 1 2 3 ... 10 >) moves across the user's 10 most recent
+     chat partners; each page shows that person's public reviews and the
+     past messages exchanged with them, side by side. -->
+<div id="reviewsBackdrop" class="reviews-backdrop"></div>
+<div id="reviewsPopup" class="reviews-popup">
+  <div class="reviews-popup-header" id="reviewsPopupHeader">
+    <span class="reviews-popup-drag-handle" aria-hidden="true">&#8942;&#8942;</span>
+    <span class="reviews-popup-title">Reviews &amp; chat history</span>
+    <button id="reviewsPopupClose" class="reviews-popup-close" aria-label="Close">&times;</button>
+  </div>
+
+  <div class="reviews-popup-body" id="reviewsPopupContent">
+    <div class="reviews-popup-loading" id="reviewsPopupLoading">Loading your recent chats&hellip;</div>
+    <div class="reviews-popup-empty" id="reviewsPopupEmpty" style="display:none;">You haven't chatted with anyone yet.</div>
+
+    <div class="reviews-partner-panel" id="reviewsPartnerPanel" style="display:none;">
+      <div class="reviews-col reviews-col-id" id="reviewsPartnerHead"></div>
+
+      <div class="reviews-col reviews-col-reviews">
+        <div class="reviews-section-label">Reviews</div>
+        <div class="reviews-list" id="reviewsList"></div>
+      </div>
+
+      <div class="reviews-col reviews-col-messages">
+        <div class="reviews-section-label">Previous messages</div>
+        <div class="reviews-messages-list" id="reviewsMessagesList"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="reviews-popup-footer">
+    <button id="reviewsPrevBtn" class="reviews-nav-arrow" aria-label="Previous person">&#10094;</button>
+    <div class="reviews-pager" id="reviewsPager"></div>
+    <button id="reviewsNextBtn" class="reviews-nav-arrow" aria-label="Next person">&#10095;</button>
+  </div>
+</div>
+
+<!-- Per-message action menu (Reply / Delete) — positioned near whichever
+     bubble was clicked -->
+<div id="msgActionMenu" class="popover-menu" style="display:none;">
+  <button data-act="reply" class="popover-item">&#8617; Reply</button>
+  <button data-act="delete-me" class="popover-item">Delete for me</button>
+  <button data-act="delete-everyone" class="popover-item danger" style="display:none;">Delete for everyone</button>
+</div>
+
+<div id="historyBackdrop" class="history-backdrop"></div>
+<div id="historyPanel" class="history-panel">
+  <div class="history-panel-header">
+    <span>All Chats</span>
+    <button id="deleteAllChatsBtn" class="icon-btn-sm" title="Delete all conversations" aria-label="Delete all conversations">&#128465;</button>
+    <button id="closeHistoryBtn" aria-label="Close">&#10005;</button>
+  </div>
+  <input id="userSearchInput" class="user-search-input" type="text" placeholder="Search people...">
+  <div class="history-tabs" id="historyTabs">
+    <div class="history-tab selected" data-tab="chats">Chats</div>
+    <div class="history-tab" data-tab="requests">Requests<span class="tab-badge" id="requestsBadge" style="display:none;">0</span></div>
+    <div class="history-tab" data-tab="friends">Friends</div>
+    <div class="history-tab" data-tab="suggested">Suggested</div>
+  </div>
+  <div id="contactsMatchRow" class="contacts-match-row" style="display:none;">
+    <button id="contactsMatchBtn" class="friend-btn primary">&#128222; Find friends from contacts</button>
+    <div id="contactsMatchStatus" class="contacts-match-status"></div>
+  </div>
+  <div id="historyList" class="history-list">
+    <div class="history-empty">No past conversations yet.</div>
+  </div>
+</div>
+
+<div id="sideMenuBackdrop" class="side-menu-backdrop"></div>
+<div id="sideMenu" class="side-menu">
+  <div class="side-menu-header" id="sideMenuHeader">
+    <div class="side-menu-avatar" id="sideMenuAvatar"></div>
+    <div class="side-menu-id">
+      <div class="side-menu-name" id="sideMenuName">—</div>
+      <div class="side-menu-view">View profile</div>
+    </div>
+    <button class="side-menu-close" id="sideMenuCloseBtn" aria-label="Close">&#10005;</button>
+  </div>
+
+  <div class="side-menu-section">
+    <button class="side-menu-item" id="smiProfile"><span class="smi-ic">&#128100;</span><span class="smi-lb">My Profile</span></button>
+    <button class="side-menu-item" id="smiEditProfile"><span class="smi-ic">&#9999;</span><span class="smi-lb">Edit Profile</span></button>
+    <button class="side-menu-item" id="smiAllChats"><span class="smi-ic">&#128172;</span><span class="smi-lb">All Chats</span></button>
+  </div>
+
+  <div class="side-menu-section">
+    <button class="side-menu-item" id="smiMatchPrefs"><span class="smi-ic">&#127760;</span><span class="smi-lb">Match Preferences</span></button>
+    <button class="side-menu-item" id="smiSettingsToggle"><span class="smi-ic">&#9881;</span><span class="smi-lb">Settings</span><span class="smi-chev">&#10095;</span></button>
+    <div class="side-menu-sub" id="smiSettingsSub">
+      <button class="side-menu-item nested" id="smiSoundToggle"><span class="smi-ic">&#128276;</span><span class="smi-lb">Sounds</span><span class="smi-chev">&#10095;</span></button>
+      <div class="side-menu-sub2" id="smiSoundSub">
+        <div class="side-menu-toggle-row">
+          <span class="smi-lb">All sounds</span>
+          <label class="side-menu-switch">
+            <input type="checkbox" id="soundMasterToggle">
+            <span class="side-menu-switch-track"></span>
+          </label>
+        </div>
+        <div class="side-menu-toggle-row indent">
+          <span class="smi-lb">Chat messages</span>
+          <label class="side-menu-switch">
+            <input type="checkbox" id="soundMessageToggle" data-sound-cat="message">
+            <span class="side-menu-switch-track"></span>
+          </label>
+        </div>
+        <div class="side-menu-toggle-row indent">
+          <span class="smi-lb">Notifications</span>
+          <label class="side-menu-switch">
+            <input type="checkbox" id="soundNotificationToggle" data-sound-cat="notification">
+            <span class="side-menu-switch-track"></span>
+          </label>
+        </div>
+        <div class="side-menu-toggle-row indent">
+          <span class="smi-lb">Connect</span>
+          <label class="side-menu-switch">
+            <input type="checkbox" id="soundConnectToggle" data-sound-cat="connect">
+            <span class="side-menu-switch-track"></span>
+          </label>
+        </div>
+        <div class="side-menu-toggle-row indent">
+          <span class="smi-lb">Stop / end chat</span>
+          <label class="side-menu-switch">
+            <input type="checkbox" id="soundStopToggle" data-sound-cat="stop">
+            <span class="side-menu-switch-track"></span>
+          </label>
+        </div>
+        <div class="side-menu-toggle-row indent">
+          <span class="smi-lb">Skip</span>
+          <label class="side-menu-switch">
+            <input type="checkbox" id="soundSkipToggle" data-sound-cat="skip">
+            <span class="side-menu-switch-track"></span>
+          </label>
+        </div>
+      </div>
+      <button class="side-menu-item" id="smiPrivacy"><span class="smi-ic">&#128274;</span><span class="smi-lb">Privacy &amp; Safety</span></button>
+    </div>
+  </div>
+
+  <div class="side-menu-section">
+    <button class="side-menu-item" id="smiHelp"><span class="smi-ic">&#10067;</span><span class="smi-lb">Help &amp; Support</span></button>
+    <button class="side-menu-item" id="smiAbout"><span class="smi-ic">&#8505;</span><span class="smi-lb">About SyncChat</span></button>
+  </div>
+
+  <div class="side-menu-section">
+    <button class="side-menu-item danger" id="smiLogout"><span class="smi-ic">&#9099;</span><span class="smi-lb">Log Out</span></button>
+  </div>
+</div>
+
+<div id="profileModal" class="profile-page">
+  <div class="profile-page-header">
+    <button id="profileCloseBtn" aria-label="Back">&#8592;</button>
+    <span id="profileHeaderTitle">Profile</span>
+    <button id="profileEditBtn" class="edit-link" style="display:none;">Edit</button>
+  </div>
+  <div id="profileBody" class="profile-body"></div>
+</div>
+
+<div class="app-shell">
+
+<!-- Auth gate: Google sign-in only, kept simple (accounts are what make
+     chat history and resuming a past stranger possible) -->
+<div id="authGate" class="gate-card">
+  <div class="gate-accent-strip"></div>
+  <div class="gate-body">
+    <div class="brand auth-brand">
+      <div class="brand-mark"><img src="/assets/syncchat-logo.svg" alt=""></div>
+      <div class="brand-name">SyncChat</div>
+    </div>
+    <h1 id="authTitle">Welcome</h1>
+    <div class="sub">Your chat history is saved to your account, so you can come back and resume with someone you've talked to before.</div>
+
+    <div class="auth-tabs">
+      <button class="auth-tab selected" data-tab="login" id="loginTabBtn">Log In</button>
+      <button class="auth-tab" data-tab="signup" id="signupTabBtn">Sign Up</button>
+    </div>
+
+    <!-- Log in: one combined field, same as Instagram/Facebook -->
+    <div id="loginFields">
+      <div class="field-label">Username, email or phone number</div>
+      <input id="authIdentifier" class="auth-input" type="text" autocomplete="username" placeholder="Username, email or phone">
+      <div class="field-label">Password</div>
+      <input id="authPasswordLogin" class="auth-input" type="password" autocomplete="current-password" placeholder="••••••••">
+    </div>
+
+    <!-- Sign up: full name, self-chosen username (live availability check),
+         a single mobile-number-or-email field (same as Instagram/Facebook),
+         date of birth, and password. -->
+    <div id="signupFields" style="display:none;">
+      <div class="field-label">Full name</div>
+      <input id="authFullName" class="auth-input" type="text" autocomplete="name" placeholder="Your name">
+
+      <div class="field-label">Username</div>
+      <input id="authUsername" class="auth-input" type="text" autocomplete="off" placeholder="username" autocapitalize="none">
+      <div class="username-hint" id="usernameHint"></div>
+
+      <div class="field-label">Mobile number or email</div>
+      <input id="authIdentifierSignup" class="auth-input" type="text" autocomplete="username" placeholder="Mobile number or email">
+
+      <div class="field-label">Date of birth</div>
+      <input id="authBirthDate" class="auth-input" type="date" autocomplete="bday">
+
+      <div class="field-label">Password</div>
+      <input id="authPasswordSignup" class="auth-input" type="password" autocomplete="new-password" placeholder="••••••••">
+
+      <div class="field-label">YouTube channel link <span style="font-weight:400;color:var(--muted);">(optional)</span></div>
+      <input id="authYoutubeSignup" class="auth-input" type="url" autocomplete="off" placeholder="https://youtube.com/@yourchannel">
+      <div class="username-hint">We encourage adding this — it helps other people trust you're a real person, not a fraud account.</div>
+    </div>
+
+    <button id="authSubmitBtn">Log In</button>
+    <div id="authStatus"></div>
+  </div>
+</div>
+<!-- Gate: shown right after login/signup. First a one-time gender
+     declaration (new accounts only — skipped once it's on file), then
+     looking-for + chat mode. -->
+<div id="gate" class="gate-card" style="display:none;">
+  <div class="gate-accent-strip"></div>
+  <div class="gate-body">
+
+    <!-- Step -1: one-time date of birth, shown once per account — collected
+         at signup for email/password accounts already (18+ age gate), this
+         only catches social-login accounts (Google doesn't hand us a
+         birthday). -->
+    <div id="birthdateStep" style="display:none;">
+      <div class="eyebrow">One quick thing</div>
+      <h1>When's your birthday?</h1>
+      <div class="sub">SyncChat requires everyone to be 18 or older. This is stored on your account and never shown publicly.</div>
+
+      <div class="field-label">Date of birth</div>
+      <input id="birthdateStepInput" class="auth-input" type="date" autocomplete="bday">
+      <button id="birthdateContinueBtn">Continue</button>
+      <div id="birthdateStepStatus"></div>
+    </div>
+
+    <!-- Step 0: one-time phone number, shown once per account — collected
+         at signup for email/password accounts already, this only catches
+         social-login accounts (Google doesn't hand us a phone number). -->
+    <div id="phoneStep" style="display:none;">
+      <div class="eyebrow">One quick thing</div>
+      <h1>Add your phone number</h1>
+      <div class="sub">Used so people who already have you in their contacts can find you here — same as WhatsApp/Instagram. Never shown publicly.</div>
+
+      <div class="field-label">Phone number</div>
+      <input id="phoneStepInput" class="auth-input" type="tel" autocomplete="tel" placeholder="+1 555 123 4567">
+      <button id="phoneContinueBtn">Continue</button>
+      <div id="phoneStepStatus"></div>
+    </div>
+
+    <!-- Step 1: one-time gender declaration, shown once per account -->
+    <div id="genderStep" style="display:none;">
+      <div class="eyebrow">One quick thing</div>
+      <h1>I am a...</h1>
+      <div class="sub">This is set once for your account and used to match you — it's what the other person sees, and what identity verification checks against.</div>
+
+      <div class="gender-row" id="genderSetRow">
+        <button class="gender-btn" data-g="male">Male</button>
+        <button class="gender-btn" data-g="female">Female</button>
+      </div>
+      <label class="declaration-box" id="declarationBox">
+        <input type="checkbox" id="genderDeclareCheck">
+        <span>I declare that the gender I've selected above is accurate. I understand that if another user reports me and it's confirmed to be false, <strong>my account will be permanently banned</strong>, with no exceptions.</span>
+      </label>
+      <button id="genderContinueBtn" disabled>Continue</button>
+      <div id="genderStatus"></div>
+    </div>
+
+    <!-- Step 2: looking-for + chat mode -->
+    <div id="matchStep" style="display:none;">
+      <div class="eyebrow">Get started</div>
+      <h1>Meet someone new</h1>
+      <div class="sub">Matched one-to-one by gender, with built-in identity verification so you know who's really on the other side.</div>
+
+      <div class="field-label">Looking to chat with...</div>
+      <div class="gender-row" id="lookingRow">
+        <button class="gender-btn" data-g="male">Male</button>
+        <button class="gender-btn" data-g="female">Female</button>
+      </div>
+
+      <div class="field-label">Chat mode</div>
+      <div class="gender-row" id="modeRow">
+        <button class="gender-btn mode-btn" data-g="text">Text<span class="mode-badge">Recommended</span></button>
+        <button class="gender-btn mode-btn locked" data-g="video" disabled title="Unlocks automatically">Video</button>
+      </div>
+      <div class="mode-tip">💡 Once you and your partner have chatted a bit and you're feeling the vibe, Video unlocks automatically — switch anytime with one click.</div>
+
+      <button id="startBtn" disabled>Allow Camera & Mic to Continue</button>
+      <div id="permStatus">Camera & mic access is required to enter — used for identity verification, even in text mode.</div>
+    </div>
+  </div>
+</div>
+
+<!-- Chat screen -->
+<div id="chatScreen">
+  <div class="stage-wrap">
+    <div class="video-stage" id="videoStage">
+      <div class="video-wrap">
+        <video id="localVideo" autoplay playsinline muted></video>
+        <div class="video-label"><span class="dot-live on"></span>You</div>
+      </div>
+      <div class="video-wrap">
+        <video id="remoteVideo" autoplay playsinline></video>
+        <div class="video-label" id="partnerLabel">Waiting for partner...</div>
+        <div id="statusToast" class="status-toast"></div>
+        <div id="switchModeOverlay" class="switch-mode-overlay"></div>
+        <div id="searchingOverlay" class="searching-overlay">
+          <div class="search-visual">
+            <div class="search-ring r1"></div>
+            <div class="search-ring r2"></div>
+            <div class="search-ring r3"></div>
+            <div class="search-logo"><img src="/assets/syncchat-logo.svg" alt=""></div>
+          </div>
+          <div class="searching-title">Finding someone</div>
+          <div class="searching-sub" id="searchingSub">MATCHING</div>
+          <div class="searching-brand">SyncChat</div>
+        </div>
+        <div id="previewOverlay" class="preview-overlay" style="display:none;">
+          <div class="preview-text">Blurred preview — continue to unblur, or skip to find someone else.</div>
+          <div class="preview-actions">
+            <button id="previewGoBtn">Continue</button>
+            <button id="previewSkipBtn">Skip</button>
+          </div>
+        </div>
+        <!-- Shown instead of an endless blur when the video/audio stream
+             never connects (e.g. no direct path between the two networks —
+             see connectFailTimeoutMs in app.js). Without this, a failed
+             connection just sits blurred forever with no explanation and
+             nothing to click. -->
+        <div id="connectFailOverlay" class="preview-overlay" style="display:none;">
+          <div class="preview-text">Couldn't connect video with this stranger — their network may be blocking it. Try someone else?</div>
+          <div class="preview-actions">
+            <button id="connectFailSkipBtn">Skip</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="messages"></div>
+    <div id="textSearchingOverlay" class="searching-overlay text-mode">
+      <div class="search-visual">
+        <div class="search-ring r1"></div>
+        <div class="search-ring r2"></div>
+        <div class="search-ring r3"></div>
+        <div class="search-logo"><img src="/assets/syncchat-logo.svg" alt=""></div>
+      </div>
+      <div class="searching-title">Finding someone</div>
+      <div class="searching-sub" id="textSearchingSub">MATCHING</div>
+      <div class="searching-brand">SyncChat</div>
+    </div>
+  </div>
+
+  <div class="bottom-input-bar">
+    <div id="selectionBar" class="selection-bar">
+      <button id="selCancelBtn" class="sel-btn" aria-label="Cancel selection">&#10005;</button>
+      <span id="selCount" class="sel-count">1 selected</span>
+      <button id="selAllBtn" class="sel-btn" aria-label="Select all">Select all</button>
+      <button id="selDeleteBtn" class="sel-btn danger" aria-label="Delete selected">&#128465;</button>
+    </div>
+    <div id="replyBar" class="reply-bar" style="display:none;">
+      <div class="reply-bar-body">
+        <div class="reply-bar-label">Replying to <span id="replyBarSender"></span></div>
+        <div class="reply-bar-text" id="replyBarText"></div>
+      </div>
+      <button id="replyBarCancel" aria-label="Cancel reply">&#10005;</button>
+    </div>
+    <div class="chat-input">
+      <button id="micBtn" class="mic-btn">&#127908;<span id="recordingHint" class="recording-hint">Recording... release to send</span></button>
+      <input id="msgInput" placeholder="Type a message..." disabled maxlength="1000">
+      <button id="sendBtn" disabled>Send</button>
+    </div>
+  </div>
+</div>
+
+<canvas id="captureCanvas" width="240" height="180"></canvas>
+<div id="globalToast" class="global-toast"></div>
+
+<!-- Report modal: fixed reasons, matches the "any confirmed report = ban"
+     policy stated at signup — this needs to be a deliberate, specific
+     action, not a free-text prompt(). -->
+<div id="reportBackdrop" class="report-backdrop"></div>
+<div id="reportModal" class="report-modal">
+  <div class="report-modal-header">Report this person</div>
+  <div class="report-modal-sub">Reports are reviewed against our policy. If confirmed, the account is <strong>permanently banned</strong>.</div>
+  <div class="report-reasons" id="reportReasons">
+    <label class="report-reason"><input type="radio" name="reportReason" value="incorrect_gender"><span>Incorrect / misrepresented gender</span></label>
+    <label class="report-reason"><input type="radio" name="reportReason" value="inappropriate"><span>Inappropriate behavior or content</span></label>
+    <label class="report-reason"><input type="radio" name="reportReason" value="fraud"><span>Fraud / scam</span></label>
+    <label class="report-reason"><input type="radio" name="reportReason" value="other"><span>Other</span></label>
+  </div>
+  <textarea id="reportDetails" placeholder="Add details (optional)" maxlength="500" style="display:none;"></textarea>
+  <div class="report-modal-actions">
+    <button id="reportCancelBtn" class="report-cancel">Cancel</button>
+    <button id="reportSubmitBtn" class="report-submit" disabled>Submit Report</button>
+  </div>
+</div>
+
+<div id="countryBackdrop" class="country-backdrop"></div>
+<div id="countryModal" class="country-modal">
+  <div class="country-modal-header">
+    <span>Who do you want to chat with?</span>
+    <button id="countryCloseBtn" aria-label="Close">&#10005;</button>
+  </div>
+  <div class="country-modal-sub">Choose a matching scope. If nobody's online there right now, we'll widen the search automatically.</div>
+  <div class="country-quick" id="countryQuick">
+    <div class="country-option" data-mode="nearby">
+      <span class="flag">&#128205;</span><span class="name">Nearby<div class="desc">People close to your location</div></span><span class="check">&#10003;</span>
+    </div>
+    <div class="country-option" data-mode="india">
+      <span class="flag">&#127470;&#127475;</span><span class="name">India<div class="desc">Anyone in India</div></span><span class="check">&#10003;</span>
+    </div>
+    <div class="country-option" data-mode="random">
+      <span class="flag">&#127760;</span><span class="name">Random<div class="desc">Anyone, anywhere</div></span><span class="check">&#10003;</span>
+    </div>
+  </div>
+  <input id="countrySearchInput" type="text" placeholder="Search for a country...">
+  <div class="country-list" id="countryList"></div>
+</div>
+
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="/countries.js"></script>
+<script src="/app.js"></script>
+</body>
+</html>

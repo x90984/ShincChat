@@ -1,0 +1,75 @@
+# Render Blueprint — https://render.com/docs/blueprint-spec
+#
+# In the Render dashboard: New -> Blueprint -> connect this GitHub repo.
+# Render reads this file and creates the service(s) below automatically.
+# See DEPLOY.md for the full walkthrough (GitHub push + Render setup).
+
+services:
+  # ---- The live site everyone uses -------------------------------------
+  - type: web
+    name: syncchat
+    runtime: node
+    plan: free              # bump to a paid plan to add the persistent disk below
+    rootDir: random-chat
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /
+    envVars:
+      - key: NODE_VERSION
+        value: 20.11.1
+      # Optional Google sign-in — leave unset to just hide that button.
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: OAUTH_BASE_URL
+        value: https://syncchat.onrender.com   # update after your first deploy gives you the real URL
+      # ---- Scale-out knobs (see SCALING.md) --------------------------------
+      # Set REDIS_URL to any standard Redis TCP URL to enable CLUSTER MODE
+      # (shared matchmaking/presence across multiple instances). Leave unset
+      # on a single free instance — the Upstash REST vars above are used then.
+      - key: REDIS_URL
+        sync: false
+      # Optional TURN relay for calls that can't go peer-to-peer.
+      - key: TURN_URLS
+        sync: false
+      - key: TURN_USERNAME
+        sync: false
+      - key: TURN_CREDENTIAL
+        sync: false
+      # Only takes effect once the disk below is attached (paid plans).
+      - key: DATA_DIR
+        value: /var/data
+    # Free plan has no persistent disk, so the SQLite file resets on every
+    # deploy/restart — fine for trying things out. Uncomment this once
+    # you're on a paid plan so accounts/chat history actually persist:
+    # disk:
+    #   name: syncchat-data
+    #   mountPath: /var/data
+    #   sizeGB: 1
+
+  # ---- Internal admin panel (optional) ----------------------------------
+  # Deployed as its own separate service with its own separate database —
+  # Render doesn't let two services share one disk. See DEPLOY.md for why,
+  # and for the simplest way to manage the live site's real data instead
+  # (running this locally against a copied-down database, or migrating to
+  # a shared Postgres database later). Delete this block if you don't
+  # need it deployed publicly at all.
+  - type: web
+    name: syncchat-admin
+    runtime: node
+    plan: free
+    rootDir: admin-panel
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_VERSION
+        value: 20.11.1
+      - key: DATA_DIR
+        value: /var/data
+      - key: DB_PATH
+        value: /var/data/syncchat.db
+    # disk:
+    #   name: syncchat-admin-data
+    #   mountPath: /var/data
+    #   sizeGB: 1

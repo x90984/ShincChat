@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SyncChat Admin Panel</title>
+<style>
+  :root {
+    --bg: #0B0E14; --panel: #12161F; --panel-2: #1A1F2B; --border: #262C3A; --border-soft: #1D2230;
+    --text: #EDEFF4; --muted: #8B93A7; --muted-2: #5B6478;
+    --accent: #33D6A6; --accent-2: #22B892; --danger: #F0475B; --danger-dim: #391722;
+    --warn: #E8A83A; --warn-dim: #3A2E12;
+    --radius: 14px; --radius-sm: 10px;
+    --font-display: 'Segoe UI', system-ui, sans-serif; --font-body: 'Segoe UI', system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--font-body); }
+  a { color: var(--accent); }
+
+  /* ---- Login / bootstrap screen ---- */
+  #authScreen {
+    min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px;
+  }
+  .auth-card { width: 380px; max-width: 100%; background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 32px; }
+  .auth-card h1 { font-size: 20px; margin: 0 0 6px; }
+  .auth-card .sub { color: var(--muted); font-size: 13px; margin-bottom: 22px; line-height: 1.5; }
+  .field-label { color: var(--muted); font-size: 11.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .03em; margin: 16px 0 8px; }
+  .field-label:first-of-type { margin-top: 0; }
+  input, textarea, select {
+    width: 100%; padding: 11px 13px; border-radius: var(--radius-sm); border: 1.5px solid var(--border);
+    background: var(--panel-2); color: var(--text); font-size: 13.5px; outline: none; font-family: inherit;
+  }
+  input:focus, textarea:focus, select:focus { border-color: var(--accent); }
+  button { font-family: inherit; }
+  .btn-primary {
+    width: 100%; padding: 13px; border-radius: var(--radius-sm); border: none; margin-top: 20px;
+    background: linear-gradient(90deg, var(--accent-2), var(--accent)); color: #06110F; font-weight: 700; font-size: 14px; cursor: pointer;
+  }
+  .btn-primary:disabled { opacity: .5; cursor: not-allowed; }
+  #authStatus { font-size: 12.5px; margin-top: 12px; color: var(--muted); min-height: 16px; text-align: center; }
+  #authStatus.err { color: var(--danger); }
+  .auth-toggle { text-align: center; font-size: 12.5px; color: var(--muted); margin-top: 16px; cursor: pointer; }
+  .auth-toggle span { color: var(--accent); font-weight: 600; }
+
+  /* ---- App shell ---- */
+  #app { display: none; min-height: 100vh; }
+  .sidebar {
+    width: 220px; flex: none; background: var(--panel); border-right: 1px solid var(--border);
+    padding: 20px 14px; position: fixed; top: 0; bottom: 0; left: 0; display: flex; flex-direction: column;
+  }
+  .sidebar-brand { display: flex; align-items: center; gap: 10px; padding: 0 8px 20px; border-bottom: 1px solid var(--border-soft); margin-bottom: 14px; }
+  .sidebar-brand .mark { width: 30px; height: 30px; border-radius: 8px; background: linear-gradient(135deg, var(--accent), var(--accent-2)); display: flex; align-items: center; justify-content: center; font-weight: 800; color: #06110F; }
+  .sidebar-brand .name { font-weight: 700; font-size: 15px; }
+  .sidebar-brand .tag { font-size: 10px; color: var(--muted-2); }
+  .nav-item {
+    display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: var(--radius-sm); cursor: pointer;
+    color: var(--muted); font-size: 13.5px; font-weight: 600; margin-bottom: 2px;
+  }
+  .nav-item:hover { background: var(--panel-2); color: var(--text); }
+  .nav-item.active { background: var(--panel-2); color: var(--accent); }
+  .sidebar-footer { margin-top: auto; padding: 10px 12px; }
+  .sidebar-footer button { width: 100%; padding: 9px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: transparent; color: var(--muted); font-size: 12.5px; cursor: pointer; }
+
+  .main { margin-left: 220px; padding: 28px 34px; flex: 1; max-width: 1100px; }
+  .page { display: none; }
+  .page.active { display: block; }
+  .page-header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 22px; flex-wrap: wrap; gap: 12px; }
+  .page-header h2 { font-size: 21px; margin: 0 0 4px; }
+  .page-header .sub { color: var(--muted); font-size: 13px; }
+
+  .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 26px; }
+  .stat-card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 18px; }
+  .stat-card .num { font-size: 24px; font-weight: 800; }
+  .stat-card .lbl { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; margin-bottom: 18px; }
+  .card h3 { margin: 0 0 4px; font-size: 15px; }
+  .card .card-sub { color: var(--muted); font-size: 12.5px; margin-bottom: 16px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .03em; padding: 8px 10px; border-bottom: 1px solid var(--border-soft); }
+  td { padding: 10px; border-bottom: 1px solid var(--border-soft); vertical-align: middle; }
+  tr:last-child td { border-bottom: none; }
+  .pill { display: inline-block; padding: 3px 9px; border-radius: 999px; font-size: 11px; font-weight: 700; }
+  .pill.banned { background: var(--danger-dim); color: var(--danger); }
+  .pill.active { background: rgba(51,214,166,.12); color: var(--accent); }
+  .pill.premium { background: var(--warn-dim); color: var(--warn); }
+  .pill.muted { background: var(--panel-2); color: var(--muted); }
+
+  .btn-sm { padding: 6px 12px; border-radius: 999px; border: 1px solid var(--border); background: var(--panel-2); color: var(--text); font-size: 11.5px; font-weight: 700; cursor: pointer; }
+  .btn-sm.danger { border-color: rgba(240,71,91,.4); color: var(--danger); }
+  .btn-sm.accent { border-color: rgba(51,214,166,.4); color: var(--accent); }
+
+  .toolbar { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+  .toolbar input, .toolbar select { width: auto; min-width: 160px; }
+  .toolbar .spacer { flex: 1; }
+
+  .toggle { position: relative; width: 42px; height: 24px; flex: none; }
+  .toggle input { opacity: 0; width: 0; height: 0; }
+  .toggle .slider { position: absolute; inset: 0; background: var(--panel-2); border: 1px solid var(--border); border-radius: 999px; cursor: pointer; transition: all .15s ease; }
+  .toggle .slider::before { content: ''; position: absolute; width: 16px; height: 16px; left: 3px; top: 3px; background: var(--muted-2); border-radius: 50%; transition: all .15s ease; }
+  .toggle input:checked + .slider { background: rgba(51,214,166,.15); border-color: var(--accent); }
+  .toggle input:checked + .slider::before { transform: translateX(18px); background: var(--accent); }
+
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .form-grid .full { grid-column: 1 / -1; }
+  .item-row { display: flex; align-items: center; justify-content: space-between; padding: 14px 0; border-bottom: 1px solid var(--border-soft); gap: 14px; }
+  .item-row:last-child { border-bottom: none; }
+  .item-row .left { flex: 1; min-width: 0; }
+  .item-row .left .title { font-weight: 700; font-size: 13.5px; }
+  .item-row .left .desc { font-size: 12px; color: var(--muted); margin-top: 3px; }
+  .item-row .right { display: flex; align-items: center; gap: 10px; flex: none; }
+  .item-row .right input[type="number"] { width: 90px; }
+
+  .empty-state { color: var(--muted-2); font-size: 13px; text-align: center; padding: 30px; }
+  .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(10px); background: var(--panel); border: 1px solid var(--border); padding: 11px 18px; border-radius: 999px; font-size: 13px; font-weight: 600; opacity: 0; pointer-events: none; transition: all .2s ease; z-index: 300; }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  @media (max-width: 780px) {
+    .sidebar { width: 100%; height: auto; position: static; flex-direction: row; overflow-x: auto; padding: 10px; }
+    .sidebar-brand { display: none; }
+    .sidebar-footer { display: none; }
+    .nav-item { white-space: nowrap; }
+    .main { margin-left: 0; padding: 20px; }
+    .form-grid { grid-template-columns: 1fr; }
+  }
+
+  /* Prevent text selection on interactive UI chrome (buttons, nav items,
+     badges) so quick/double clicks trigger actions instead of highlighting
+     text. Table/data text and inputs remain selectable. */
+  button,
+  .btn-primary,
+  .btn-sm,
+  .nav-item,
+  [role="button"],
+  [role="menuitem"],
+  [role="tab"] {
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    -webkit-touch-callout: none;
+  }
+</style>
+</head>
+<body>
+
+<div id="authScreen">
+  <div class="auth-card">
+    <h1 id="authHeading">Admin Login</h1>
+    <div class="sub" id="authSub">Sign in to manage SyncChat — users, reports, ads, premium plans, and monetization settings.</div>
+    <div class="field-label">Username</div>
+    <input id="authUsername" type="text" autocomplete="username">
+    <div class="field-label">Password</div>
+    <input id="authPassword" type="password" autocomplete="current-password">
+    <button class="btn-primary" id="authSubmitBtn">Log In</button>
+    <div id="authStatus"></div>
+  </div>
+</div>
+
+<div id="app">
+  <div class="sidebar">
+    <div class="sidebar-brand">
+      <div class="mark">V</div>
+      <div><div class="name">SyncChat Admin</div><div class="tag">Standalone control panel</div></div>
+    </div>
+    <div class="nav-item active" data-page="dashboard">📊 Dashboard</div>
+    <div class="nav-item" data-page="users">👤 Users</div>
+    <div class="nav-item" data-page="reports">🚩 Reports</div>
+    <div class="nav-item" data-page="ads">📢 Ads</div>
+    <div class="nav-item" data-page="premium">💎 Premium Plans</div>
+    <div class="nav-item" data-page="monetization">💰 Monetization</div>
+    <div class="nav-item" data-page="match-settings">🌍 Match Settings</div>
+    <div class="sidebar-footer"><button id="logoutBtn">Log out</button></div>
+  </div>
+
+  <div class="main">
+
+    <div class="page active" id="page-dashboard">
+      <div class="page-header"><div><h2>Dashboard</h2><div class="sub">Live overview of the platform.</div></div></div>
+      <div class="stat-grid" id="statGrid"></div>
+      <div class="card">
+        <h3>Quick notes</h3>
+        <div class="card-sub">This panel reads/writes the same SQLite database file the main chat app uses — that's the only connection between the two. It is deployed and run completely separately.</div>
+      </div>
+    </div>
+
+    <div class="page" id="page-users">
+      <div class="page-header"><div><h2>Users</h2><div class="sub">Search, ban/unban, and grant premium.</div></div></div>
+      <div class="toolbar">
+        <input id="userSearch" placeholder="Search username...">
+        <select id="userFilter">
+          <option value="all">All users</option>
+          <option value="banned">Banned only</option>
+          <option value="premium">Premium only</option>
+        </select>
+        <div class="spacer"></div>
+      </div>
+      <div class="card" style="padding:0;">
+        <table>
+          <thead><tr><th>Username</th><th>Gender</th><th>Joined</th><th>Status</th><th></th></tr></thead>
+          <tbody id="usersTableBody"></tbody>
+        </table>
+        <div class="empty-state" id="usersEmpty" style="display:none;">No users found.</div>
+      </div>
+    </div>
+
+    <div class="page" id="page-reports">
+      <div class="page-header"><div><h2>Reports</h2><div class="sub">Every report filed, and what happened as a result.</div></div></div>
+      <div class="card" style="padding:0;">
+        <table>
+          <thead><tr><th>Reported</th><th>Reason</th><th>Details</th><th>Reported by</th><th>When</th><th>Status</th><th></th></tr></thead>
+          <tbody id="reportsTableBody"></tbody>
+        </table>
+        <div class="empty-state" id="reportsEmpty" style="display:none;">No reports yet.</div>
+      </div>
+    </div>
+
+    <div class="page" id="page-ads">
+      <div class="page-header">
+        <div><h2>Ads</h2><div class="sub">Ad slots shown in the main app (gate screen, chat banner, history panel).</div></div>
+        <button class="btn-sm accent" id="newAdBtn">+ New Ad</button>
+      </div>
+      <div id="adsList"></div>
+      <div class="empty-state" id="adsEmpty" style="display:none;">No ads yet — click "New Ad" to create one.</div>
+    </div>
+
+    <div class="page" id="page-premium">
+      <div class="page-header">
+        <div><h2>Premium Plans</h2><div class="sub">Subscription tiers users can purchase.</div></div>
+        <button class="btn-sm accent" id="newPlanBtn">+ New Plan</button>
+      </div>
+      <div id="plansList"></div>
+      <div class="empty-state" id="plansEmpty" style="display:none;">No plans yet — click "New Plan" to create one.</div>
+    </div>
+
+    <div class="page" id="page-monetization">
+      <div class="page-header"><div><h2>Monetization</h2><div class="sub">Toggle and adjust every way the platform can earn — enable what you're ready to launch.</div></div></div>
+      <div class="card">
+        <h3>Moderation policy</h3>
+        <div class="card-sub">Controls what happens when a user is reported.</div>
+        <div class="item-row">
+          <div class="left"><div class="title">Auto-ban on report</div><div class="desc">If off, reports are logged for manual review instead of an immediate ban.</div></div>
+          <div class="right"><label class="toggle"><input type="checkbox" id="autoBanToggle"><span class="slider"></span></label></div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Chat behavior</h3>
+        <div class="card-sub">Controls when text-chat users are allowed to switch to video.</div>
+        <div class="item-row">
+          <div class="left"><div class="title">Messages required to unlock video (per side)</div><div class="desc">Each person in the text chat must send at least this many messages before either can switch to video.</div></div>
+          <div class="right"><input type="number" min="1" step="1" id="videoUnlockThresholdInput" style="width:70px;"></div>
+        </div>
+      </div>
+      <div class="card" id="monetizationMethodsCard">
+        <h3>Earning methods</h3>
+        <div class="card-sub">Each can be turned on independently, with its own adjustable rate where relevant.</div>
+        <div id="monetizationMethodsList"></div>
+      </div>
+    </div>
+
+    <div class="page" id="page-match-settings">
+      <div class="page-header"><div><h2>Match Settings</h2><div class="sub">Sets the default matching scope for the country/nearby picker on the chat top bar — applies to first-time visitors before they've picked anything themselves. Existing users who've already made a choice keep their own preference.</div></div></div>
+      <div class="card">
+        <h3>Default scope</h3>
+        <div class="card-sub">Works the same way for every option: if nobody's currently online in scope, the search automatically widens (e.g. Nearby falls back to same-country, then anyone) rather than waiting forever.</div>
+        <div class="item-row">
+          <div class="left"><div class="title">Nearby</div><div class="desc">Match with people physically closest, using their device location.</div></div>
+          <div class="right"><input type="radio" name="defaultMatchMode" value="nearby" id="matchModeNearby"></div>
+        </div>
+        <div class="item-row">
+          <div class="left"><div class="title">India</div><div class="desc">Match only within India.</div></div>
+          <div class="right"><input type="radio" name="defaultMatchMode" value="india" id="matchModeIndia"></div>
+        </div>
+        <div class="item-row">
+          <div class="left"><div class="title">Random</div><div class="desc">Match with anyone, anywhere — no country filter.</div></div>
+          <div class="right"><input type="radio" name="defaultMatchMode" value="random" id="matchModeRandom"></div>
+        </div>
+        <div class="item-row">
+          <div class="left"><div class="title">Specific country</div><div class="desc">Match only within one chosen country.</div></div>
+          <div class="right" style="gap:10px;">
+            <select id="matchModeCountrySelect" style="max-width:200px;"></select>
+            <input type="radio" name="defaultMatchMode" value="country" id="matchModeCountry">
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Ad editor modal -->
+<div id="adModalBackdrop" class="report-backdrop" style="position:fixed;inset:0;background:rgba(5,8,14,.65);z-index:150;display:none;"></div>
+<div id="adModal" class="card" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); width:420px; max-width:92vw; z-index:151; margin:0;">
+  <h3 id="adModalTitle">New Ad</h3>
+  <div class="form-grid">
+    <div class="full"><div class="field-label">Title</div><input id="adTitle"></div>
+    <div class="full"><div class="field-label">Body text</div><textarea id="adBody" rows="2"></textarea></div>
+    <div><div class="field-label">Image URL</div><input id="adImageUrl"></div>
+    <div><div class="field-label">Link URL</div><input id="adLinkUrl"></div>
+    <div class="full"><div class="field-label">Placement</div>
+      <select id="adPlacement">
+        <option value="gate">Onboarding / Gate screen</option>
+        <option value="chat_banner">In-chat banner</option>
+        <option value="history_panel">History panel</option>
+      </select>
+    </div>
+    <div class="full item-row" style="padding:8px 0;">
+      <div class="left"><div class="title">Enabled</div></div>
+      <div class="right"><label class="toggle"><input type="checkbox" id="adEnabled" checked><span class="slider"></span></label></div>
+    </div>
+  </div>
+  <button class="btn-primary" id="adSaveBtn">Save Ad</button>
+  <button class="btn-sm" style="width:100%;margin-top:10px;" id="adCancelBtn">Cancel</button>
+</div>
+
+<!-- Plan editor modal -->
+<div id="planModalBackdrop" class="report-backdrop" style="position:fixed;inset:0;background:rgba(5,8,14,.65);z-index:150;display:none;"></div>
+<div id="planModal" class="card" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); width:420px; max-width:92vw; z-index:151; margin:0;">
+  <h3 id="planModalTitle">New Plan</h3>
+  <div class="form-grid">
+    <div class="full"><div class="field-label">Plan name</div><input id="planName" placeholder="e.g. SyncChat Gold"></div>
+    <div><div class="field-label">Price (in cents)</div><input id="planPrice" type="number" min="0" placeholder="e.g. 999 = $9.99"></div>
+    <div><div class="field-label">Currency</div><input id="planCurrency" value="USD"></div>
+    <div class="full"><div class="field-label">Billing interval</div>
+      <select id="planInterval">
+        <option value="monthly">Monthly</option>
+        <option value="yearly">Yearly</option>
+        <option value="lifetime">Lifetime</option>
+      </select>
+    </div>
+    <div class="full"><div class="field-label">Features (one per line)</div><textarea id="planFeatures" rows="4" placeholder="No ads&#10;Unlimited history&#10;Priority matching"></textarea></div>
+    <div class="full item-row" style="padding:8px 0;">
+      <div class="left"><div class="title">Enabled</div></div>
+      <div class="right"><label class="toggle"><input type="checkbox" id="planEnabled" checked><span class="slider"></span></label></div>
+    </div>
+  </div>
+  <button class="btn-primary" id="planSaveBtn">Save Plan</button>
+  <button class="btn-sm" style="width:100%;margin-top:10px;" id="planCancelBtn">Cancel</button>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script src="/countries.js"></script>
+<script src="/admin.js"></script>
+</body>
+</html>

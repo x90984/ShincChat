@@ -1,0 +1,17 @@
+{
+  "name": "syncchat-admin-panel",
+  "version": "1.0.0",
+  "description": "Standalone admin panel for SyncChat — users/bans/reports, ads, premium plans, and monetization settings. Shares the main app's SQLite file on disk; not otherwise attached to it.",
+  "main": "server.js",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "start": "node server.js"
+  },
+  "license": "ISC",
+  "dependencies": {
+    "express": "^5.2.1",
+    "better-sqlite3": "^13.0.3"
+  }
+}
